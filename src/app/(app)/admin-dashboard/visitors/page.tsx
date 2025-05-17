@@ -29,7 +29,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Loader2, Lightbulb, CalendarIcon, LogOut } from "lucide-react";
+import { Plus, Search, Loader2, Lightbulb, CalendarIcon, LogOut, Users } from "lucide-react"; // Added Users
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
