@@ -1,5 +1,4 @@
 
-import VisitorRegistrationForm from "@/components/visitor/visitor-registration-form";
 import DashboardSummary from "@/components/dashboard/dashboard-summary";
 import { Home } from "lucide-react";
 
@@ -14,7 +13,7 @@ export default function AdminDashboardPage() {
         {/* Optional: Add a button or quick action here if needed */}
       </div>
       <DashboardSummary />
-      <VisitorRegistrationForm />
+      {/* VisitorRegistrationForm was removed from here as its functionality is now in /visitors page */}
     </div>
   );
 }
