@@ -34,7 +34,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar variant="sidebar" collapsible="icon" side="left" defaultOpen={true}>
+      <Sidebar variant="sidebar" collapsible="icon" side="left" defaultOpen={false}> {/* Changed defaultOpen to false */}
         <SidebarHeader className="p-4 flex items-center gap-2">
           <Clipboard className="w-8 h-8 text-primary" />
           <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">Calypso del Caribe</h1>
@@ -66,4 +66,3 @@ export default function AppShell({ children }: AppShellProps) {
     </div>
   );
 }
-
