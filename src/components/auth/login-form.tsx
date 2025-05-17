@@ -67,14 +67,14 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="identification">Identificación (CC)</Label>
+        <Label htmlFor="identification">Identificación</Label>
         <div className="relative">
           <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="identification"
             type="text"
             {...register('identification')}
-            placeholder="Número de CC"
+            placeholder="Ingrese su identificación"
             className="pl-10"
           />
         </div>
