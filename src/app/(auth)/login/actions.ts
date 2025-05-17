@@ -1,3 +1,4 @@
+
 // src/app/(auth)/login/actions.ts
 'use server'; // Make this a server action
 
@@ -13,11 +14,12 @@ export interface LoginActionResult {
 }
 
 export async function loginAction(prevState: any, formData: FormData): Promise<LoginActionResult> {
-  const email = formData.get('email') as string;
+  const identification = formData.get('identification') as string;
   const password = formData.get('password') as string;
 
-  // Simulate authentication
-  if (email === 'admin@example.com' && password === 'password') {
+  // Simulate authentication with a CC and password
+  // For testing, let's use '123456789' as a mock CC
+  if (identification === '123456789' && password === 'password') {
     // In a real app, generate a secure token and set httpOnly cookie
     cookies().set('mock_auth_token', 'mock_user_jwt_token', {
       // httpOnly: true, // httpOnly can't be easily tested with client-side redirects in mock, but good for real app
@@ -27,6 +29,6 @@ export async function loginAction(prevState: any, formData: FormData): Promise<L
     });
     return { success: true, message: 'Inicio de sesión exitoso.' };
   } else {
-    return { success: false, message: 'Correo electrónico o contraseña incorrectos.' };
+    return { success: false, message: 'Número de identificación o contraseña incorrectos.' };
   }
 }

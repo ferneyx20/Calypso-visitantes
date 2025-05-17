@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm, type SubmitHandler } from 'react-hook-form';
@@ -15,7 +16,7 @@ import { loginAction, type LoginActionResult } from '@/app/(auth)/login/actions'
 
 
 const loginSchema = z.object({
-  email: z.string().email({ message: 'Por favor, ingrese un correo válido.' }),
+  identification: z.string().min(5, { message: 'Por favor, ingrese un número de identificación válido.' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
 });
 
@@ -40,7 +41,7 @@ export default function LoginForm() {
     startTransition(async () => {
       // Create FormData to pass to server action
       const formData = new FormData();
-      formData.append('email', data.email);
+      formData.append('identification', data.identification);
       formData.append('password', data.password);
 
       const result: LoginActionResult = await loginAction(null, formData);
@@ -66,18 +67,18 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="email">Usuario (Correo Electrónico)</Label>
+        <Label htmlFor="identification">Identificación (CC)</Label>
         <div className="relative">
           <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            id="email"
-            type="email"
-            {...register('email')}
-            placeholder="usuario@ejemplo.com"
+            id="identification"
+            type="text"
+            {...register('identification')}
+            placeholder="Número de CC"
             className="pl-10"
           />
         </div>
-        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+        {errors.identification && <p className="text-sm text-destructive">{errors.identification.message}</p>}
       </div>
 
       <div className="space-y-2">
