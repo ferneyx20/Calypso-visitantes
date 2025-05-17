@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { VisitorFormData } from "@/app/(app)/admin-dashboard/visitors/schemas";
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import Image from 'next/image'; // Using next/image for optimized images including data URIs
+import Image from 'next/image';
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,8 +15,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Combobox } from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Loader2, Lightbulb, CalendarIcon, UserCheck, Camera, FileImage, ScanLine, UserSquare2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Lightbulb, CalendarIcon, UserCheck, Camera, FileImage, ScanLine, UserSquare2, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "../ui/scroll-area";
@@ -27,7 +27,6 @@ interface VisitorRegistrationFormFieldsProps {
   form: UseFormReturn<VisitorFormData>;
   isCategorizing: boolean;
   suggestedCategory: string | null;
-  // Options states and handlers
   tipoDocumentoOptions: string[];
   onAddTipoDocumento: (newOption: string) => void;
   generoOptions: string[];
@@ -41,7 +40,7 @@ interface VisitorRegistrationFormFieldsProps {
   epsOptions: string[];
   onAddEps: (newOption: string) => void;
   employeeComboboxOptions: { value: string; label: string }[];
-  isSubmitting?: boolean; // Optional for controlling submit button state
+  isSubmitting?: boolean;
 }
 
 export default function VisitorRegistrationFormFields({
@@ -65,14 +64,15 @@ export default function VisitorRegistrationFormFields({
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null); // Hidden canvas for photo capture
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [capturedPhotoDataUri, setCapturedPhotoDataUri] = useState<string | null>(form.getValues('photoDataUri') || null);
-  const [isScanningId, setIsScanningId] = useState(false);
+  
+  const [rawScannedDataInput, setRawScannedDataInput] = useState("");
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
 
-  // Effect for camera logic
   useEffect(() => {
     const stopCameraTracks = () => {
       if (videoRef.current && videoRef.current.srcObject) {
@@ -98,14 +98,13 @@ export default function VisitorRegistrationFormFields({
             title: 'Acceso a Cámara Denegado',
             description: 'Por favor, active los permisos de cámara en su navegador para esta función.',
           });
-          setIsCameraOpen(false); // Close camera if permission denied
+          setIsCameraOpen(false);
         }
       };
       getCameraPermission();
     } else {
       stopCameraTracks();
     }
-    // Cleanup function to stop tracks when component unmounts or camera closes
     return () => {
       stopCameraTracks();
     };
@@ -119,7 +118,6 @@ export default function VisitorRegistrationFormFields({
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      // Set canvas dimensions to match video to avoid distortion
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
@@ -129,8 +127,8 @@ export default function VisitorRegistrationFormFields({
         const dataUri = canvas.toDataURL('image/jpeg');
         setCapturedPhotoDataUri(dataUri);
         form.setValue('photoDataUri', dataUri, { shouldValidate: true, shouldDirty: true });
-        setIsCameraOpen(false); // Close camera after capture
-         toast({ title: "Foto Capturada", description: "La foto del visitante ha sido capturada." });
+        setIsCameraOpen(false);
+        toast({ title: "Foto Capturada", description: "La foto del visitante ha sido capturada." });
       }
     } else {
         toast({ variant: "destructive", title: "Error de Captura", description: "No se pudo acceder a los elementos de video o canvas." });
@@ -151,63 +149,76 @@ export default function VisitorRegistrationFormFields({
     }
   };
 
-  const handleScanIdSimulated = () => {
-    setIsScanningId(true);
-    toast({ title: "Simulación", description: "Escaneando cédula..." });
+  const handleProcessScannedData = () => {
+    setIsProcessingScan(true);
+    toast({ title: "Procesando datos...", description: "Simulando lectura de cédula con lector físico." });
 
-    // Simulate API call or scanning process
     setTimeout(() => {
-      const mockCedulaData = {
-        numeroDocumento: '1098765432',
-        nombres: 'Luisa Fernanda',
-        apellidos: 'Gómez Arias',
-        genero: 'Femenino', // Ensure this is in generoOptions or will be added
-        fechanacimiento: new Date(1995, 3, 22), // April 22, 1995
-        rh: 'A+', // Ensure this is in rhOptions or will be added
-      };
+      // Ejemplo de una cadena muy simplificada que el lector físico podría "escribir".
+      // En la realidad, esta cadena es larga y compleja (formato PDF417).
+      // Para la simulación, usaremos un identificador simple.
+      const MOCK_PDF417_SIMPLIFIED_TRIGGER = "SCAN_LUISA_GOMEZ"; 
 
-      form.setValue('numerodocumento', mockCedulaData.numerodocumento, { shouldValidate: true });
-      form.setValue('nombres', mockCedulaData.nombres, { shouldValidate: true });
-      form.setValue('apellidos', mockCedulaData.apellidos, { shouldValidate: true });
-      
-      // For comboboxes, ensure the value exists or can be added
-      if (generoOptions.includes(mockCedulaData.genero) || !onAddGenero) {
-        form.setValue('genero', mockCedulaData.genero, { shouldValidate: true });
+      if (rawScannedDataInput.trim() === MOCK_PDF417_SIMPLIFIED_TRIGGER) {
+        const mockCedulaData = {
+          numeroDocumento: '1098765432',
+          nombres: 'Luisa Fernanda',
+          apellidos: 'Gómez Arias',
+          genero: 'Femenino',
+          fechanacimiento: new Date(1995, 3, 22), // April 22, 1995
+          rh: 'A+',
+        };
+
+        form.setValue('numerodocumento', mockCedulaData.numerodocumento, { shouldValidate: true });
+        form.setValue('nombres', mockCedulaData.nombres, { shouldValidate: true });
+        form.setValue('apellidos', mockCedulaData.apellidos, { shouldValidate: true });
+        
+        if (generoOptions.includes(mockCedulaData.genero) || !onAddGenero) {
+          form.setValue('genero', mockCedulaData.genero, { shouldValidate: true });
+        } else {
+          onAddGenero(mockCedulaData.genero);
+          form.setValue('genero', mockCedulaData.genero, { shouldValidate: true });
+        }
+        
+        form.setValue('fechanacimiento', mockCedulaData.fechanacimiento, { shouldValidate: true });
+
+        if (rhOptions.includes(mockCedulaData.rh) || !onAddRh) {
+           form.setValue('rh', mockCedulaData.rh, { shouldValidate: true });
+        } else {
+          onAddRh(mockCedulaData.rh);
+          form.setValue('rh', mockCedulaData.rh, { shouldValidate: true });
+        }
+        
+        // Sugerir un tipo de documento si aún no está seleccionado
+        if (!form.getValues('tipodocumento')) {
+            if (tipoDocumentoOptions.includes("CC")) {
+                 form.setValue('tipodocumento', "CC", { shouldValidate: true });
+            }
+        }
+
+        toast({ title: "Autocompletado Exitoso (Simulado)", description: "Datos de la cédula cargados." });
       } else {
-        onAddGenero(mockCedulaData.genero);
-        form.setValue('genero', mockCedulaData.genero, { shouldValidate: true });
+        toast({ variant: "destructive", title: "Error de Procesamiento", description: "Los datos escaneados no coinciden con el formato esperado o no se pudieron procesar. Intente con: SCAN_LUISA_GOMEZ" });
       }
-      
-      form.setValue('fechanacimiento', mockCedulaData.fechanacimiento, { shouldValidate: true });
-
-      if (rhOptions.includes(mockCedulaData.rh) || !onAddRh) {
-         form.setValue('rh', mockCedulaData.rh, { shouldValidate: true });
-      } else {
-        onAddRh(mockCedulaData.rh);
-        form.setValue('rh', mockCedulaData.rh, { shouldValidate: true });
-      }
-
-
-      toast({ title: "Autocompletado (Simulado)", description: "Datos de la cédula cargados." });
-      setIsScanningId(false);
+      setRawScannedDataInput(""); 
+      setIsProcessingScan(false);
     }, 1500);
   };
 
   return (
-    <ScrollArea className="h-[65vh] sm:h-[70vh] p-1 pr-4"> {/* Increased height */}
+    <ScrollArea className="h-[65vh] sm:h-[70vh] p-1 pr-4">
       <div className="space-y-6 p-2">
-        {/* Canvas for capturing photo - hidden */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-        {/* Sección de Fotografía y Escaneo */}
         <Card>
-          <CardHeader><CardTitle className="text-lg">Identificación Visual y Escaneo</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">Identificación Visual y por Lector</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            {/* Columna de Fotografía */}
             <div className="space-y-3">
               <FormLabel>Fotografía del Visitante</FormLabel>
               <div className="w-full aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden border">
                 {capturedPhotoDataUri ? (
-                  <Image src={capturedPhotoDataUri} alt="Foto del visitante" width={200} height={200} className="object-cover w-full h-full" />
+                  <Image src={capturedPhotoDataUri} alt="Foto del visitante" width={200} height={200} className="object-cover w-full h-full" data-ai-hint="person portrait" />
                 ) : (
                   <UserSquare2 className="w-24 h-24 text-muted-foreground" />
                 )}
@@ -253,19 +264,36 @@ export default function VisitorRegistrationFormFields({
                 render={({ field }) => ( <FormItem className="hidden"> <FormControl><Input {...field} /></FormControl> </FormItem> )}
               />
             </div>
-            <div className="space-y-4 md:pt-8"> {/* Align with label height */}
-               <FormLabel>Autocompletar Datos (Simulado)</FormLabel>
-               <Button type="button" variant="default" onClick={handleScanIdSimulated} disabled={isScanningId} className="w-full">
-                {isScanningId ? <Loader2 className="mr-2 animate-spin" /> : <ScanLine className="mr-2" />}
-                Escanear Cédula (Simulado)
-              </Button>
-              <FormDescription>
-                Simula el escaneo de una cédula colombiana (PDF417) para autocompletar campos como documento, nombres, etc.
+
+            {/* Columna de Escaneo con Lector Físico */}
+            <div className="space-y-4">
+              <FormLabel htmlFor="rawScannedData">Datos de Cédula (Lector Físico)</FormLabel>
+              <Input
+                id="rawScannedData"
+                placeholder="Esperando datos del lector..."
+                value={rawScannedDataInput}
+                onChange={(e) => setRawScannedDataInput(e.target.value)}
+                aria-describedby="scan-helper-text"
+              />
+              <FormDescription id="scan-helper-text">
+                Use su lector de códigos de barras físico para escanear la cédula. Los datos aparecerán aquí.
+                Para simulación, ingrese: <code className="bg-muted p-1 rounded">SCAN_LUISA_GOMEZ</code>
               </FormDescription>
+              <Button type="button" onClick={handleProcessScannedData} disabled={isProcessingScan || !rawScannedDataInput} className="w-full">
+                {isProcessingScan ? <Loader2 className="mr-2 animate-spin" /> : <ScanLine className="mr-2" />}
+                Procesar Datos Escaneados
+              </Button>
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Información Importante</AlertTitle>
+                <AlertDescription>
+                  Esta función simula el autocompletado a partir de datos que un lector físico de códigos de barras (PDF417) ingresaría en el campo de arriba.
+                  La decodificación real del formato PDF417 no está implementada en este prototipo.
+                </AlertDescription>
+              </Alert>
             </div>
           </CardContent>
         </Card>
-
 
         {/* Información Personal del Visitante */}
         <Card>
@@ -644,3 +672,4 @@ export default function VisitorRegistrationFormFields({
     </ScrollArea>
   );
 }
+
