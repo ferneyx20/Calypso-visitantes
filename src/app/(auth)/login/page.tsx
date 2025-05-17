@@ -51,10 +51,6 @@ export default function LoginPage() {
           </p>
           <LoginForm />
         </div>
-         <p className="mt-auto text-xs text-muted-foreground text-center">
-            App: V1.24.1130.1 Api: V1.24.1130.1 Google Azure<br />
-            BD Unoee: V BD Web: v
-          </p>
       </div>
     </div>
   );
