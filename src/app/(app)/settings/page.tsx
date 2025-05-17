@@ -5,10 +5,16 @@ import { Settings } from "lucide-react";
 export default function SettingsPage() {
   return (
     <div className="container mx-auto space-y-8">
-      <Card>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-semibold flex items-center">
+          <Settings className="mr-3 h-8 w-8 text-primary" />
+          Configuración
+        </h1>
+      </div>
+      <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-2xl font-semibold">
-            <Settings className="h-6 w-6 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+            {/* Icon removed from here as it's in the main h1 now */}
             Configuración de la Aplicación
           </CardTitle>
         </CardHeader>
@@ -47,4 +53,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

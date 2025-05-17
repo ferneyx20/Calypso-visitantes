@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Building, Home, Users, Settings } from "lucide-react";
+import { Building, Home, Users, Settings, UsersRound, Building2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AppHeader from './app-header';
@@ -24,9 +24,11 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
 
   const menuItems = [
-    { href: "/admin-dashboard", label: "Dashboard", icon: Home }, // Updated href
-    { href: "/visitors", label: "Visitantes", icon: Users },
-    { href: "/settings", label: "Configuración", icon: Settings },
+    { href: "/admin-dashboard", label: "Dashboard", icon: Home },
+    { href: "/admin-dashboard/visitors", label: "Visitantes", icon: Users },
+    { href: "/admin-dashboard/employees", label: "Gestión Empleados", icon: UsersRound },
+    { href: "/admin-dashboard/branches", label: "Gestión Sedes", icon: Building2 },
+    { href: "/admin-dashboard/settings", label: "Configuración", icon: Settings },
   ];
 
   return (
@@ -42,7 +44,7 @@ export default function AppShell({ children }: AppShellProps) {
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} passHref legacyBehavior>
                   <SidebarMenuButton
-                    isActive={pathname === item.href}
+                    isActive={pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/admin-dashboard")}
                     tooltip={item.label}
                   >
                     <item.icon />
