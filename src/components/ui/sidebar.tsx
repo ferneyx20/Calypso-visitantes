@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -159,9 +160,10 @@ SidebarProvider.displayName = "SidebarProvider"
 const Sidebar = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
-    side?: "left" | "right"
-    variant?: "sidebar" | "floating" | "inset"
-    collapsible?: "offcanvas" | "icon" | "none"
+    side?: "left" | "right";
+    variant?: "sidebar" | "floating" | "inset";
+    collapsible?: "offcanvas" | "icon" | "none";
+    defaultOpen?: boolean; // Explicitly define defaultOpen
   }
 >(
   (
@@ -171,11 +173,12 @@ const Sidebar = React.forwardRef<
       collapsible = "offcanvas",
       className,
       children,
-      ...props
+      defaultOpen, // Destructure defaultOpen
+      ...restProps // All other props
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
     if (collapsible === "none") {
       return (
@@ -185,16 +188,21 @@ const Sidebar = React.forwardRef<
             className
           )}
           ref={ref}
-          {...props}
+          {...restProps} // Spread only restProps
         >
           {children}
         </div>
-      )
+      );
     }
 
     if (isMobile) {
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+        <Sheet 
+          open={openMobile} 
+          onOpenChange={setOpenMobile} 
+          defaultOpen={defaultOpen} // Pass destructured defaultOpen to Sheet
+          {...restProps} // Pass restProps to Sheet
+        >
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
@@ -209,7 +217,7 @@ const Sidebar = React.forwardRef<
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
-      )
+      );
     }
 
     return (
@@ -220,11 +228,13 @@ const Sidebar = React.forwardRef<
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
+        // No props spread on this outer div
       >
         {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
             "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
+            "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
@@ -244,7 +254,7 @@ const Sidebar = React.forwardRef<
               : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
             className
           )}
-          {...props}
+          {...restProps} // Spread only restProps here
         >
           <div
             data-sidebar="sidebar"
@@ -254,10 +264,10 @@ const Sidebar = React.forwardRef<
           </div>
         </div>
       </div>
-    )
+    );
   }
-)
-Sidebar.displayName = "Sidebar"
+);
+Sidebar.displayName = "Sidebar";
 
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
@@ -761,3 +771,4 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
