@@ -29,8 +29,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Temporarily commented out authentication logic
-  /*
   if (isAuthenticated) {
     // If authenticated and trying to access /login, redirect to app root
     if (pathname === LOGIN_PATH) {
@@ -43,7 +41,6 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
   }
-  */
 
   return NextResponse.next();
 }
@@ -63,3 +60,4 @@ export const config = {
     '/((?!api|_next/static|_next/image|images|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.jpeg$).*)',
   ],
 };
+
