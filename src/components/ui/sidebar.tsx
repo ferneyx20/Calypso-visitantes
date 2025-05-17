@@ -85,7 +85,9 @@ const SidebarProvider = React.forwardRef<
         }
 
         // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        if (typeof document !== 'undefined') {
+          document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        }
       },
       [setOpenProp, open]
     )
@@ -108,9 +110,10 @@ const SidebarProvider = React.forwardRef<
           toggleSidebar()
         }
       }
-
-      window.addEventListener("keydown", handleKeyDown)
-      return () => window.removeEventListener("keydown", handleKeyDown)
+      if (typeof window !== 'undefined') {
+        window.addEventListener("keydown", handleKeyDown)
+        return () => window.removeEventListener("keydown", handleKeyDown)
+      }
     }, [toggleSidebar])
 
     // We add a state so that we can do data-state="expanded" or "collapsed".
@@ -180,6 +183,12 @@ const Sidebar = React.forwardRef<
   ) => {
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
+    if (isMobile === undefined) {
+      // Render null on the server and initial client render
+      // to avoid mismatch before isMobile is determined.
+      return null;
+    }
+
     if (collapsible === "none") {
       return (
         <div
@@ -200,7 +209,7 @@ const Sidebar = React.forwardRef<
         <Sheet 
           open={openMobile} 
           onOpenChange={setOpenMobile} 
-          defaultOpen={defaultOpen} // Pass destructured defaultOpen to Sheet
+          // defaultOpen={defaultOpen} // defaultOpen is for uncontrolled Sheet state, which we are controlling with openMobile
           {...restProps} // Pass restProps to Sheet
         >
           <SheetContent
@@ -771,4 +780,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-

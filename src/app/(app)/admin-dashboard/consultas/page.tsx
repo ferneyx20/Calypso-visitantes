@@ -5,7 +5,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIcon, Search, FileDown } from "lucide-react";
+import { Calendar as CalendarIcon, Search, FileDown, History } from "lucide-react"; // Added History
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,7 +32,7 @@ interface PastVisitorEntry {
 const MOCK_PAST_VISITS: PastVisitorEntry[] = [
   { id: "pv-1", nombres: "Luisa", apellidos: "Fernandez", numerodocumento: "10203040", personavisitada: "Ana Gómez (Recepción)", horaentrada: new Date(2023, 10, 15, 9, 0), horasalida: new Date(2023, 10, 15, 10, 30), purpose: "Entrega de propuesta comercial", category: "Proveedor" },
   { id: "pv-2", nombres: "Pedro", apellidos: "Ramirez", numerodocumento: "50607080", personavisitada: "Carlos López (TI)", horaentrada: new Date(2023, 11, 1, 14, 0), horasalida: new Date(2023, 11, 1, 15, 0), purpose: "Soporte técnico equipo", category: "Contratista" },
-  { id: "pv-3", nombres: "Elena", apellidos: "Vargas", numerodocumento: "90102030", personavisitada: "Juan Pérez (Ventas)", horaentrada: new Date(), horasalida: null, purpose: "Reunión de seguimiento", category: "Cliente" }
+  { id: "pv-3", nombres: "Elena", apellidos: "Vargas", numerodocumento: "90102030", personavisitada: "Juan Pérez (Ventas)", horaentrada: new Date(2024, 0, 20, 11, 0), horasalida: null, purpose: "Reunión de seguimiento", category: "Cliente" } // Changed new Date() to a fixed date
 ];
 
 
