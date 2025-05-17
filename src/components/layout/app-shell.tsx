@@ -9,9 +9,8 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Building, Home, Users, Settings, UsersRound, Building2, ListChecks, History } from "lucide-react"; // Added History
+import { Home, Users, Settings, UsersRound, Building2, ListChecks, History, ClipboardUser } from "lucide-react"; 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AppHeader from './app-header';
@@ -26,7 +25,7 @@ export default function AppShell({ children }: AppShellProps) {
   const menuItems = [
     { href: "/admin-dashboard", label: "Dashboard", icon: Home },
     { href: "/admin-dashboard/visitors", label: "Visitantes", icon: Users },
-    { href: "/admin-dashboard/consultas", label: "Consultas", icon: History }, // Nueva entrada
+    { href: "/admin-dashboard/consultas", label: "Consultas", icon: History }, 
     { href: "/admin-dashboard/employees", label: "Gestión Empleados", icon: UsersRound },
     { href: "/admin-dashboard/branches", label: "Gestión Sedes", icon: Building2 },
     { href: "/admin-dashboard/user-management", label: "Gestión Usuarios", icon: Settings },
@@ -37,8 +36,8 @@ export default function AppShell({ children }: AppShellProps) {
     <div className="flex min-h-screen">
       <Sidebar variant="sidebar" collapsible="icon" side="left" defaultOpen={true}>
         <SidebarHeader className="p-4 flex items-center gap-2">
-          <Building className="w-8 h-8 text-primary" />
-          <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">Visitantes</h1>
+          <ClipboardUser className="w-8 h-8 text-primary" />
+          <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">Calypso del Caribe</h1>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
@@ -67,3 +66,4 @@ export default function AppShell({ children }: AppShellProps) {
     </div>
   );
 }
+
