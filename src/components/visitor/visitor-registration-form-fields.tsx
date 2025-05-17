@@ -5,19 +5,23 @@ import type { UseFormReturn } from "react-hook-form";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { VisitorFormData } from "@/app/(app)/admin-dashboard/visitors/schemas";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import Image from 'next/image'; // Using next/image for optimized images including data URIs
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
-import { Loader2, Lightbulb, CalendarIcon, UserCheck } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Loader2, Lightbulb, CalendarIcon, UserCheck, Camera, FileImage, ScanLine, UserSquare2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "../ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface VisitorRegistrationFormFieldsProps {
   form: UseFormReturn<VisitorFormData>;
@@ -58,9 +62,211 @@ export default function VisitorRegistrationFormFields({
   onAddEps,
   employeeComboboxOptions,
 }: VisitorRegistrationFormFieldsProps) {
+  const { toast } = useToast();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // Hidden canvas for photo capture
+
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [capturedPhotoDataUri, setCapturedPhotoDataUri] = useState<string | null>(form.getValues('photoDataUri') || null);
+  const [isScanningId, setIsScanningId] = useState(false);
+
+  // Effect for camera logic
+  useEffect(() => {
+    const stopCameraTracks = () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    };
+
+    if (isCameraOpen) {
+      const getCameraPermission = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setHasCameraPermission(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Acceso a Cámara Denegado',
+            description: 'Por favor, active los permisos de cámara en su navegador para esta función.',
+          });
+          setIsCameraOpen(false); // Close camera if permission denied
+        }
+      };
+      getCameraPermission();
+    } else {
+      stopCameraTracks();
+    }
+    // Cleanup function to stop tracks when component unmounts or camera closes
+    return () => {
+      stopCameraTracks();
+    };
+  }, [isCameraOpen, toast]);
+
+  const handleToggleCamera = () => {
+    setIsCameraOpen(prev => !prev);
+  };
+
+  const handleCaptureFromStream = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      // Set canvas dimensions to match video to avoid distortion
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUri = canvas.toDataURL('image/jpeg');
+        setCapturedPhotoDataUri(dataUri);
+        form.setValue('photoDataUri', dataUri, { shouldValidate: true, shouldDirty: true });
+        setIsCameraOpen(false); // Close camera after capture
+         toast({ title: "Foto Capturada", description: "La foto del visitante ha sido capturada." });
+      }
+    } else {
+        toast({ variant: "destructive", title: "Error de Captura", description: "No se pudo acceder a los elementos de video o canvas." });
+    }
+  };
+  
+  const handlePhotoInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUri = reader.result as string;
+        setCapturedPhotoDataUri(dataUri);
+        form.setValue('photoDataUri', dataUri, { shouldValidate: true, shouldDirty: true });
+        toast({ title: "Foto Subida", description: "La foto del visitante ha sido seleccionada." });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleScanIdSimulated = () => {
+    setIsScanningId(true);
+    toast({ title: "Simulación", description: "Escaneando cédula..." });
+
+    // Simulate API call or scanning process
+    setTimeout(() => {
+      const mockCedulaData = {
+        numeroDocumento: '1098765432',
+        nombres: 'Luisa Fernanda',
+        apellidos: 'Gómez Arias',
+        genero: 'Femenino', // Ensure this is in generoOptions or will be added
+        fechanacimiento: new Date(1995, 3, 22), // April 22, 1995
+        rh: 'A+', // Ensure this is in rhOptions or will be added
+      };
+
+      form.setValue('numerodocumento', mockCedulaData.numerodocumento, { shouldValidate: true });
+      form.setValue('nombres', mockCedulaData.nombres, { shouldValidate: true });
+      form.setValue('apellidos', mockCedulaData.apellidos, { shouldValidate: true });
+      
+      // For comboboxes, ensure the value exists or can be added
+      if (generoOptions.includes(mockCedulaData.genero) || !onAddGenero) {
+        form.setValue('genero', mockCedulaData.genero, { shouldValidate: true });
+      } else {
+        onAddGenero(mockCedulaData.genero);
+        form.setValue('genero', mockCedulaData.genero, { shouldValidate: true });
+      }
+      
+      form.setValue('fechanacimiento', mockCedulaData.fechanacimiento, { shouldValidate: true });
+
+      if (rhOptions.includes(mockCedulaData.rh) || !onAddRh) {
+         form.setValue('rh', mockCedulaData.rh, { shouldValidate: true });
+      } else {
+        onAddRh(mockCedulaData.rh);
+        form.setValue('rh', mockCedulaData.rh, { shouldValidate: true });
+      }
+
+
+      toast({ title: "Autocompletado (Simulado)", description: "Datos de la cédula cargados." });
+      setIsScanningId(false);
+    }, 1500);
+  };
+
   return (
-    <ScrollArea className="h-[60vh] p-1 pr-4">
+    <ScrollArea className="h-[65vh] sm:h-[70vh] p-1 pr-4"> {/* Increased height */}
       <div className="space-y-6 p-2">
+        {/* Canvas for capturing photo - hidden */}
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+        {/* Sección de Fotografía y Escaneo */}
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Identificación Visual y Escaneo</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="space-y-3">
+              <FormLabel>Fotografía del Visitante</FormLabel>
+              <div className="w-full aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden border">
+                {capturedPhotoDataUri ? (
+                  <Image src={capturedPhotoDataUri} alt="Foto del visitante" width={200} height={200} className="object-cover w-full h-full" />
+                ) : (
+                  <UserSquare2 className="w-24 h-24 text-muted-foreground" />
+                )}
+              </div>
+              {isCameraOpen && hasCameraPermission !== false && (
+                <div className="w-full aspect-video bg-black rounded-md overflow-hidden mt-2">
+                  <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
+                </div>
+              )}
+              {hasCameraPermission === false && !isCameraOpen && (
+                 <Alert variant="destructive" className="mt-2">
+                  <Camera className="h-4 w-4" />
+                  <AlertTitle>Error de Cámara</AlertTitle>
+                  <AlertDescription>
+                    No se pudo acceder a la cámara. Verifique los permisos en su navegador.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                <Button type="button" variant="outline" onClick={handleToggleCamera} className="flex-1">
+                  <Camera className="mr-2" /> {isCameraOpen ? "Cerrar Cámara" : "Abrir Cámara"}
+                </Button>
+                {isCameraOpen && (
+                  <Button type="button" onClick={handleCaptureFromStream} className="flex-1">
+                    Capturar Foto
+                  </Button>
+                )}
+              </div>
+              <Input 
+                type="file" 
+                accept="image/*" 
+                ref={photoInputRef} 
+                onChange={handlePhotoInputChange} 
+                className="hidden" 
+                id="photo-upload-input"
+              />
+              <Button type="button" variant="outline" onClick={() => photoInputRef.current?.click()} className="w-full">
+                <FileImage className="mr-2" /> Subir Foto Existente
+              </Button>
+               <FormField
+                control={form.control}
+                name="photoDataUri"
+                render={({ field }) => ( <FormItem className="hidden"> <FormControl><Input {...field} /></FormControl> </FormItem> )}
+              />
+            </div>
+            <div className="space-y-4 md:pt-8"> {/* Align with label height */}
+               <FormLabel>Autocompletar Datos (Simulado)</FormLabel>
+               <Button type="button" variant="default" onClick={handleScanIdSimulated} disabled={isScanningId} className="w-full">
+                {isScanningId ? <Loader2 className="mr-2 animate-spin" /> : <ScanLine className="mr-2" />}
+                Escanear Cédula (Simulado)
+              </Button>
+              <FormDescription>
+                Simula el escaneo de una cédula colombiana (PDF417) para autocompletar campos como documento, nombres, etc.
+              </FormDescription>
+            </div>
+          </CardContent>
+        </Card>
+
+
         {/* Información Personal del Visitante */}
         <Card>
           <CardHeader><CardTitle className="text-lg">Información Personal del Visitante</CardTitle></CardHeader>
@@ -74,7 +280,7 @@ export default function VisitorRegistrationFormFields({
                   <Combobox
                     options={tipoDocumentoOptions}
                     value={field.value || ""}
-                    onChange={field.onChange}
+                    onChange={(value) => { field.onChange(value); form.trigger('tipodocumento'); }}
                     onAddOption={onAddTipoDocumento}
                     placeholder="Seleccione o escriba tipo"
                     searchPlaceholder="Buscar o agregar tipo..."
@@ -128,7 +334,7 @@ export default function VisitorRegistrationFormFields({
                   <Combobox
                     options={generoOptions}
                     value={field.value || ""}
-                    onChange={field.onChange}
+                    onChange={(value) => { field.onChange(value); form.trigger('genero'); }}
                     onAddOption={onAddGenero}
                     placeholder="Seleccione o escriba género"
                     searchPlaceholder="Buscar o agregar género..."
@@ -192,7 +398,7 @@ export default function VisitorRegistrationFormFields({
                   <Combobox
                     options={rhOptions}
                     value={field.value || ""}
-                    onChange={field.onChange}
+                    onChange={(value) => { field.onChange(value); form.trigger('rh'); }}
                     onAddOption={onAddRh}
                     placeholder="Seleccione o escriba RH"
                     searchPlaceholder="Buscar o agregar RH..."
@@ -283,7 +489,7 @@ export default function VisitorRegistrationFormFields({
                   <Combobox
                     options={tipoVisitaOptions}
                     value={field.value || ""}
-                    onChange={field.onChange}
+                    onChange={(value) => { field.onChange(value); form.trigger('tipovisita'); }}
                     onAddOption={onAddTipoVisita}
                     placeholder="Seleccione o escriba tipo"
                     searchPlaceholder="Buscar o agregar tipo..."
@@ -349,7 +555,7 @@ export default function VisitorRegistrationFormFields({
                   <Combobox
                     options={arlOptions}
                     value={field.value || ""}
-                    onChange={field.onChange}
+                    onChange={(value) => { field.onChange(value); form.trigger('arl'); }}
                     onAddOption={onAddArl}
                     placeholder="Seleccione o escriba ARL"
                     searchPlaceholder="Buscar o agregar ARL..."
@@ -370,7 +576,7 @@ export default function VisitorRegistrationFormFields({
                   <Combobox
                     options={epsOptions}
                     value={field.value || ""}
-                    onChange={field.onChange}
+                    onChange={(value) => { field.onChange(value); form.trigger('eps'); }}
                     onAddOption={onAddEps}
                     placeholder="Seleccione o escriba EPS"
                     searchPlaceholder="Buscar o agregar EPS..."

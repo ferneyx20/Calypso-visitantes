@@ -33,6 +33,9 @@ export const EPS_OPTIONS = [
 
 
 export const visitorRegistrationSchema = z.object({
+  // Visitor Photo
+  photoDataUri: z.string().optional(),
+
   // Visitor Personal Information
   tipodocumento: z.string().min(1, { message: "El tipo de documento es requerido." }),
   numerodocumento: z.string().min(5, { message: "El número de documento es requerido." }),
@@ -79,4 +82,3 @@ export interface VisitorEntry extends VisitorFormData {
 export function toWritableArray<T extends string>(arr: readonly T[]): string[] {
   return [...arr];
 }
-
