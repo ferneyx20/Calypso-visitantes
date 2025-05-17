@@ -10,7 +10,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { Home, Users, Settings, UsersRound, Building2, ListChecks, History, ClipboardUser } from "lucide-react"; 
+import { Home, Users, Settings, UsersRound, Building2, ListChecks, History, Clipboard } from "lucide-react"; 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AppHeader from './app-header';
@@ -36,7 +36,7 @@ export default function AppShell({ children }: AppShellProps) {
     <div className="flex min-h-screen">
       <Sidebar variant="sidebar" collapsible="icon" side="left" defaultOpen={true}>
         <SidebarHeader className="p-4 flex items-center gap-2">
-          <ClipboardUser className="w-8 h-8 text-primary" />
+          <Clipboard className="w-8 h-8 text-primary" />
           <h1 className="text-xl font-semibold group-data-[collapsible=icon]:hidden">Calypso del Caribe</h1>
         </SidebarHeader>
         <SidebarContent>
