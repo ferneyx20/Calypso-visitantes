@@ -51,7 +51,7 @@ export default function BranchesPage() {
   };
 
   return (
-    <div className="w-full space-y-8">
+    <div className="w-full flex flex-col flex-1 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold flex items-center">
           <Building2 className="mr-3 h-8 w-8 text-primary" />
@@ -121,7 +121,7 @@ export default function BranchesPage() {
         </Dialog>
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="shadow-lg flex flex-col flex-1">
         <CardHeader>
           <CardTitle>Administrar Sedes</CardTitle>
           <CardDescription>
@@ -129,8 +129,8 @@ export default function BranchesPage() {
             La tabla de sedes aparecerá aquí.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="mt-4 flex items-center justify-center h-60 border-2 border-dashed border-border rounded-lg bg-card">
+        <CardContent className="p-6 pt-0 flex flex-col flex-1">
+          <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
             <p className="text-muted-foreground">Próximamente: Tabla de Sedes</p>
           </div>
         </CardContent>

@@ -28,7 +28,6 @@ export default function AppShell({ children }: AppShellProps) {
     { href: "/admin-dashboard/visitors", label: "Visitantes", icon: Users },
     { href: "/admin-dashboard/employees", label: "Gestión Empleados", icon: UsersRound },
     { href: "/admin-dashboard/branches", label: "Gestión Sedes", icon: Building2 },
-    // { href: "/admin-dashboard/settings", label: "Configuración", icon: Settings }, // Removed
   ];
 
   return (
@@ -58,7 +57,7 @@ export default function AppShell({ children }: AppShellProps) {
       </Sidebar>
       <SidebarInset className="flex flex-col flex-1">
         <AppHeader />
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <main className="flex flex-col flex-1 p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </SidebarInset>
