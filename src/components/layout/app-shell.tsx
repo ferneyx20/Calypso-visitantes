@@ -28,6 +28,7 @@ export default function AppShell({ children }: AppShellProps) {
     { href: "/admin-dashboard/visitors", label: "Visitantes", icon: Users },
     { href: "/admin-dashboard/employees", label: "Gestión Empleados", icon: UsersRound },
     { href: "/admin-dashboard/branches", label: "Gestión Sedes", icon: Building2 },
+    { href: "/admin-dashboard/user-management", label: "Gestión Usuarios", icon: Settings }, // Nueva entrada
   ];
 
   return (
@@ -43,7 +44,7 @@ export default function AppShell({ children }: AppShellProps) {
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} passHref legacyBehavior>
                   <SidebarMenuButton
-                    isActive={pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/admin-dashboard")}
+                    isActive={pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/admin-dashboard" && item.href.length > "/admin-dashboard".length) || (pathname === "/admin-dashboard" && item.href === "/admin-dashboard")}
                     tooltip={item.label}
                   >
                     <item.icon />
@@ -64,3 +65,4 @@ export default function AppShell({ children }: AppShellProps) {
     </div>
   );
 }
+
