@@ -29,7 +29,6 @@ interface SearchableEmployee {
 interface PlatformUser extends SearchableEmployee {
   userId: string;
   role: "Administrador" | "Estándar";
-  email?: string; // Email para el login del usuario de plataforma
 }
 
 const MOCK_SEARCHABLE_EMPLOYEES: SearchableEmployee[] = [
@@ -42,8 +41,6 @@ const userRoleSchema = z.object({
   employeeId: z.string(),
   employeeName: z.string(),
   role: z.enum(["Administrador", "Estándar"], { required_error: "Debe seleccionar un rol." }),
-  // Opcional: email para el usuario de plataforma, si es diferente o se asigna aquí
-  email: z.string().email({ message: "Ingrese un correo válido para el usuario." }).optional(),
 });
 type UserRoleFormData = z.infer<typeof userRoleSchema>;
 
@@ -82,7 +79,6 @@ export default function UserManagementPage() {
       employeeId: employee.id,
       employeeName: employee.nombreApellido,
       role: undefined, // Forzar selección
-      email: `${employee.nombreApellido.toLowerCase().replace(/\s+/g, '.')}@example.com` // Email sugerido
     });
     setIsRoleDialogOpen(true);
   };
@@ -97,7 +93,6 @@ export default function UserManagementPage() {
       ...selectedEmployee,
       userId: `user-${Date.now()}`,
       role: data.role,
-      email: data.email,
     };
     setPlatformUsers(prev => [...prev, newPlatformUser]);
     // Opcional: remover de searchResults si ya fue convertido
@@ -192,7 +187,7 @@ export default function UserManagementPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nombre Completo</TableHead>
-                    <TableHead>Email (Login)</TableHead>
+                    <TableHead>Identificación</TableHead>
                     <TableHead>Rol</TableHead>
                     {/* <TableHead className="text-right">Acciones</TableHead> */}
                   </TableRow>
@@ -201,7 +196,7 @@ export default function UserManagementPage() {
                   {platformUsers.map((user) => (
                     <TableRow key={user.userId}>
                       <TableCell className="font-medium">{user.nombreApellido}</TableCell>
-                       <TableCell>{user.email || 'No asignado'}</TableCell>
+                       <TableCell>{user.identificacion}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === "Administrador" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
                           {user.role === "Administrador" ? <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> : <Users className="mr-1.5 h-3.5 w-3.5" />}
@@ -230,7 +225,7 @@ export default function UserManagementPage() {
           <DialogHeader>
             <DialogTitle>Asignar Rol a: {selectedEmployee?.nombreApellido}</DialogTitle>
             <DialogDescription>
-              Seleccione el rol para este usuario en la plataforma. Opcionalmente, defina su email de acceso.
+              Seleccione el rol para este usuario en la plataforma.
             </DialogDescription>
           </DialogHeader>
           <Form {...roleForm}>
@@ -252,19 +247,6 @@ export default function UserManagementPage() {
                         <SelectItem value="Administrador">Administrador</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={roleForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email de Acceso (Opcional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="ejemplo@dominio.com" {...field} />
-                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -293,3 +275,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
