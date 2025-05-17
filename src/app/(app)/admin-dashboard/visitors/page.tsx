@@ -80,8 +80,8 @@ export default function VisitorsPage() {
   
   const employeeComboboxOptions = useMemo(() => 
     SIMULATED_EMPLOYEES.map(emp => ({
-      value: emp.id,
-      label: `${emp.name} (ID: ${emp.identification})`,
+      value: emp.id, // Use a unique ID for value
+      label: `${emp.name} (ID: ${emp.identification})`, // Display name and ID
     })), 
   []);
 
@@ -152,10 +152,15 @@ export default function VisitorsPage() {
 
   const onSubmit: SubmitHandler<VisitorFormData> = async (data) => {
     setIsSubmitting(true);
+    // Find the employee label based on the ID stored in personavisitada
+    const selectedEmployeeOption = employeeComboboxOptions.find(opt => opt.value === data.personavisitada);
+    const personavisitadaLabel = selectedEmployeeOption ? selectedEmployeeOption.label : data.personavisitada;
+
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     const newEntry: VisitorEntry = {
       ...data,
+      personavisitada: personavisitadaLabel, // Store the label for display
       id: `visit-${Date.now()}`,
       horaentrada: new Date(),
       horasalida: null,
@@ -215,13 +220,19 @@ export default function VisitorsPage() {
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
         <h1 className="text-3xl font-semibold flex items-center">
           <Users className="mr-3 h-8 w-8 text-primary" />
           Gestión de Visitantes
         </h1>
         <div className="flex gap-2">
-          <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
+          <Dialog open={isRegisterDialogOpen} onOpenChange={(open) => {
+            setIsRegisterDialogOpen(open);
+            if (!open) {
+              form.reset();
+              setSuggestedCategory(null);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Plus className="mr-2 h-4 w-4" />
@@ -388,7 +399,7 @@ export default function VisitorsPage() {
                       <TableCell className="font-medium">{`${visitor.nombres} ${visitor.apellidos}`}</TableCell>
                       <TableCell>{visitor.tipodocumento}</TableCell>
                       <TableCell>{visitor.numerodocumento}</TableCell>
-                      <TableCell>{visitor.personavisitada}</TableCell>
+                      <TableCell>{visitor.personavisitada}</TableCell> {/* Displaying the stored label */}
                       <TableCell>{format(new Date(visitor.horaentrada), "Pp", { locale: es })}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" onClick={() => handleMarkExit(visitor.id)}>
@@ -406,3 +417,6 @@ export default function VisitorsPage() {
     </div>
   );
 }
+
+
+    
