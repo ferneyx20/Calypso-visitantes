@@ -26,17 +26,24 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-// Select ya no se usa directamente aquí para los campos que se vuelven Combobox
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Loader2, Lightbulb, CalendarIcon, LogOut, Users } from "lucide-react";
+import { Plus, Search, Loader2, Lightbulb, CalendarIcon, LogOut, Users, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+
+// Simulación de empleados
+const SIMULATED_EMPLOYEES = [
+  { id: "emp-001", name: "Juan Pérez (Ventas)", identification: "12345678" },
+  { id: "emp-002", name: "Ana Gómez (Recepción)", identification: "87654321" },
+  { id: "emp-003", name: "Carlos López (TI)", identification: "11223344" },
+  { id: "emp-004", name: "Sofía Ramírez (RRHH)", identification: "44332211" },
+];
+
 
 // Debounce function
 const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
@@ -66,10 +73,16 @@ export default function VisitorsPage() {
   const [tipoVisitaOptions, setTipoVisitaOptions] = useState<string[]>(toWritableArray(TIPO_VISITA_OPTIONS));
   const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
   const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
+  
+  // Options for "Persona a Visitar" combobox
+  const employeeOptions = useMemo(() => 
+    SIMULATED_EMPLOYEES.map(emp => emp.name), 
+  []);
 
   const form = useForm<VisitorFormData>({
     resolver: zodResolver(visitorRegistrationSchema),
     defaultValues: {
+      personavisitada: "",
       purpose: "",
       category: "",
       tipodocumento: undefined,
@@ -187,6 +200,14 @@ export default function VisitorsPage() {
       setOptionsList(prev => [...prev, optionValue]);
     }
   };
+  
+  const employeeComboboxOptions = useMemo(() => {
+    return SIMULATED_EMPLOYEES.map(emp => ({
+      value: emp.id, // Use a unique ID as value
+      label: `${emp.name} (ID: ${emp.identification})`, // Display name and ID
+    }));
+  }, []);
+
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
@@ -211,7 +232,7 @@ export default function VisitorsPage() {
               <form onSubmit={form.handleSubmit(onSubmit)}>
                 <ScrollArea className="h-[60vh] p-1 pr-4">
                   <div className="space-y-6 p-2">
-                    {/* Información Personal del Visitante - Ahora primero */}
+                    {/* Información Personal del Visitante */}
                     <Card>
                       <CardHeader><CardTitle className="text-lg">Información Personal del Visitante</CardTitle></CardHeader>
                       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -368,7 +389,7 @@ export default function VisitorsPage() {
                       </CardContent>
                     </Card>
 
-                    {/* Detalles de la Visita - Ahora segundo */}
+                    {/* Detalles de la Visita */}
                     <Card>
                       <CardHeader><CardTitle className="text-lg">Detalles de la Visita</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
@@ -378,7 +399,22 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Persona a Visitar</FormLabel>
-                              <FormControl><Input placeholder="Ej: Juan Pérez, Departamento de Ventas" {...field} /></FormControl>
+                               <Combobox
+                                options={employeeComboboxOptions.map(opt => opt.label)} // Use labels for display
+                                value={
+                                  employeeComboboxOptions.find(opt => opt.label === field.value)?.label || field.value || ""
+                                }
+                                onChange={(selectedLabel) => {
+                                   field.onChange(selectedLabel); // Store the label/name
+                                }}
+                                placeholder="Buscar empleado por nombre o ID..."
+                                searchPlaceholder="Escriba nombre o ID del empleado..."
+                                emptyMessage="Empleado no encontrado."
+                                // onAddOption not applicable here as we're selecting existing employees
+                                disabled={field.disabled}
+                                // Custom icon or indicator
+                                icon={<UserCheck className="mr-2 h-4 w-4 text-primary" />}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -650,4 +686,3 @@ export default function VisitorsPage() {
     </div>
   );
 }
-
