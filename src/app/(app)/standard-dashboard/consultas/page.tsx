@@ -1,35 +1,206 @@
 
-// Por ahora, este será un placeholder.
-// Podrías copiar y adaptar el contenido de /src/app/(app)/admin-dashboard/consultas/page.tsx
-// y luego filtrar los datos para mostrar solo las visitas del usuario estándar.
+"use client";
 
-import { History } from "lucide-react";
+import { useState } from "react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
+import { Calendar as CalendarIcon, Search, FileDown, History } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+// Simulación de datos de visitas pasadas
+interface PastVisitorEntry {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  numerodocumento: string;
+  personavisitada: string;
+  horaentrada: Date;
+  horasalida: Date | null;
+  purpose: string;
+  category?: string;
+  // TODO: Add a field like 'registeredByUserId' to filter for standard user
+}
+
+const MOCK_PAST_VISITS_STANDARD: PastVisitorEntry[] = [ // Renamed to avoid conflict if both are imported
+  { id: "pv-std-1", nombres: "Luisa", apellidos: "Fernandez", numerodocumento: "10203040", personavisitada: "Ana Gómez (Recepción)", horaentrada: new Date(2023, 10, 15, 9, 0), horasalida: new Date(2023, 10, 15, 10, 30), purpose: "Entrega de propuesta comercial", category: "Proveedor" },
+  // Add more visits relevant to a "standard user" if needed for testing
+];
+
 
 export default function StandardConsultasPage() {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [searchResults, setSearchResults] = useState<PastVisitorEntry[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const handleSearch = () => {
+    setHasSearched(true);
+    let results = MOCK_PAST_VISITS_STANDARD; // Use standard user's mock data
+    // TODO: In a real app, filter by current standard user's ID
+
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      results = results.filter(
+        (visit) =>
+          (visit.nombres.toLowerCase() + " " + visit.apellidos.toLowerCase()).includes(lowerSearchTerm) ||
+          visit.numerodocumento.includes(lowerSearchTerm) ||
+          visit.personavisitada.toLowerCase().includes(lowerSearchTerm)
+      );
+    }
+
+    if (dateRange?.from) {
+      results = results.filter((visit) => new Date(visit.horaentrada) >= dateRange.from!);
+    }
+    if (dateRange?.to) {
+      const toDate = new Date(dateRange.to);
+      toDate.setHours(23, 59, 59, 999);
+      results = results.filter((visit) => new Date(visit.horaentrada) <= toDate);
+    }
+    setSearchResults(results);
+    if (results.length === 0) {
+        toast({title: "Sin Resultados", description: "No se encontraron visitas con los criterios seleccionados."})
+    }
+  };
+
+  const handleExport = (format: "Excel" | "PDF") => {
+    toast({
+      title: `Exportar a ${format} (Simulado)`,
+      description: `La funcionalidad de exportar a ${format} aún no está implementada.`,
+    });
+  };
+
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold flex items-center">
           <History className="mr-3 h-8 w-8 text-primary" />
-          Mis Consultas de Visitas (Estándar)
+          Mis Consultas de Visitas
         </h1>
       </div>
-      <Card className="shadow-lg flex flex-col flex-1 w-full">
+
+      <Card className="shadow-lg w-full">
         <CardHeader>
-          <CardTitle>Buscar Mis Visitas Pasadas</CardTitle>
+          <CardTitle>Filtros de Búsqueda</CardTitle>
           <CardDescription>
-            Filtra y busca las visitas que has registrado.
+            Busque visitas que usted haya registrado por nombre, documento, persona visitada o rango de fechas.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 pt-0 flex flex-col flex-1">
-           <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
-            <p className="text-muted-foreground">
-              Funcionalidad de consulta de visitas (versión estándar) próximamente.
-            </p>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+            <div className="space-y-1">
+              <Label htmlFor="search-term">Término de Búsqueda</Label>
+              <Input
+                id="search-term"
+                placeholder="Nombre, documento, persona visitada..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <Label htmlFor="date-range">Rango de Fechas</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date-range"
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !dateRange && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "LLL dd, y", { locale: es })} -{" "}
+                          {format(dateRange.to, "LLL dd, y", { locale: es })}
+                        </>
+                      ) : (
+                        format(dateRange.from, "LLL dd, y", { locale: es })
+                      )
+                    ) : (
+                      <span>Seleccione un rango</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                    locale={es}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <Button onClick={handleSearch} className="lg:self-end">
+              <Search className="mr-2 h-4 w-4" />
+              Buscar Mis Visitas
+            </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg flex flex-col flex-1 w-full">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div>
+                <CardTitle>Resultados de la Búsqueda</CardTitle>
+                <CardDescription>Visitas encontradas según los criterios de búsqueda.</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => handleExport("Excel")} disabled={searchResults.length === 0}>
+                <FileDown className="mr-2 h-4 w-4" /> Exportar a Excel
+              </Button>
+              <Button variant="outline" onClick={() => handleExport("PDF")} disabled={searchResults.length === 0}>
+                <FileDown className="mr-2 h-4 w-4" /> Exportar a PDF
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 pt-0 flex flex-col flex-1">
+          { !hasSearched ? (
+             <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+                <p className="text-muted-foreground">Ingrese criterios y presione "Buscar Mis Visitas" para ver resultados.</p>
+            </div>
+          ) : searchResults.length > 0 ? (
+            <div className="mt-4 overflow-auto">
+              {/* Aquí iría la tabla de resultados. Por ahora un placeholder. */}
+              <p className="text-sm text-muted-foreground">
+                Mostrando {searchResults.length} visita(s) pasada(s). (Tabla de detalles próximamente)
+              </p>
+              <ul className="mt-2 space-y-1">
+                {searchResults.map(visit => (
+                    <li key={visit.id} className="text-xs p-2 border rounded-md bg-muted/30">
+                       {visit.nombres} {visit.apellidos} (Doc: {visit.numerodocumento}) - Visitó a: {visit.personavisitada} el {format(visit.horaentrada, "Pp", {locale: es})}
+                    </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+              <p className="text-muted-foreground">No se encontraron visitas que coincidan con los criterios.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
+
+    

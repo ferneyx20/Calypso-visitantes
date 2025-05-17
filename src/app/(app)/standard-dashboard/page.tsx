@@ -11,7 +11,9 @@ export default function StandardDashboardPage() {
           Panel de Control Estándar
         </h1>
       </div>
-      <DashboardSummary />
+      <DashboardSummary userRole="Estándar" />
     </div>
   );
 }
+
+    

@@ -26,6 +26,10 @@ interface Visit {
   purpose: string;
 }
 
+interface DashboardSummaryProps {
+  userRole?: 'Admin' | 'Estándar';
+}
+
 const MOCK_SEDES: Sede[] = [
   { id: "sede-norte", name: "Sede Norte" },
   { id: "sede-centro", name: "Sede Centro" },
@@ -64,7 +68,7 @@ const generateMockVisits = (numVisits: number): Visit[] => {
 
 const ALL_MOCK_VISITS = generateMockVisits(150); // Generate 150 mock visits
 
-export default function DashboardSummary() {
+export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummaryProps) {
   const [dateRange, setDateRange] = useState<string>("all_time");
   const [filteredVisits, setFilteredVisits] = useState<Visit[]>(ALL_MOCK_VISITS);
 
@@ -179,18 +183,22 @@ export default function DashboardSummary() {
           icon={<UserSquare className="h-6 w-6 text-primary" />}
           description="Personas actualmente en las instalaciones"
         />
-        <SummaryCard
-          title="Total Sedes Activas"
-          value={totalSedes.toString()}
-          icon={<Building className="h-6 w-6 text-primary" />}
-          description="Sedes operativas registradas"
-        />
-        <SummaryCard
-          title="Total Empleados"
-          value={totalEmpleados.toString()}
-          icon={<Briefcase className="h-6 w-6 text-primary" />}
-          description="Empleados registrados en el sistema"
-        />
+        {userRole === 'Admin' && (
+          <>
+            <SummaryCard
+              title="Total Sedes Activas"
+              value={totalSedes.toString()}
+              icon={<Building className="h-6 w-6 text-primary" />}
+              description="Sedes operativas registradas"
+            />
+            <SummaryCard
+              title="Total Empleados"
+              value={totalEmpleados.toString()}
+              icon={<Briefcase className="h-6 w-6 text-primary" />}
+              description="Empleados registrados en el sistema"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
@@ -244,3 +252,5 @@ export default function DashboardSummary() {
     </section>
   );
 }
+
+    
