@@ -2,10 +2,10 @@
 // src/app/(app)/admin-dashboard/visitors/schemas.ts
 import { z } from "zod";
 
-export const TIPO_DOCUMENTO = ["CC", "CE", "TI", "Pasaporte", "Otro"] as const;
-export const GENERO = ["Masculino", "Femenino", "No binario", "Prefiero no decir", "Otro"] as const;
+export const TIPO_DOCUMENTO = ["CC", "CE", "TI", "Pasaporte"] as const;
+export const GENERO = ["Masculino", "Femenino", "No binario", "Prefiero no decir"] as const;
 export const RH = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"] as const;
-export const TIPO_VISITA_OPTIONS = ["Programada", "No Programada", "Contratista", "Mensajería", "Entrevista", "Proveedor", "Cliente", "Otro"] as const;
+export const TIPO_VISITA_OPTIONS = ["Programada", "No Programada", "Contratista", "Mensajería", "Entrevista", "Proveedor", "Cliente"] as const;
 
 export const ARL_OPTIONS = [
   "Sura",
@@ -16,7 +16,6 @@ export const ARL_OPTIONS = [
   "Mapfre",
   "Equidad Seguros",
   "Alfa",
-  "Otro",
 ] as const;
 
 export const EPS_OPTIONS = [
@@ -30,19 +29,18 @@ export const EPS_OPTIONS = [
   "Aliansalud EPS",
   "Mutual SER",
   "SOS EPS",
-  "Otro",
 ] as const;
 
 
 export const visitorRegistrationSchema = z.object({
-  // Visitor Personal Information (Ahora primero)
-  tipodocumento: z.enum(TIPO_DOCUMENTO, { required_error: "El tipo de documento es requerido." }),
+  // Visitor Personal Information
+  tipodocumento: z.string().min(1, { message: "El tipo de documento es requerido." }),
   numerodocumento: z.string().min(5, { message: "El número de documento es requerido." }),
   nombres: z.string().min(2, { message: "El nombre es requerido." }),
   apellidos: z.string().min(2, { message: "Los apellidos son requeridos." }),
-  genero: z.enum(GENERO, { required_error: "El género es requerido." }),
+  genero: z.string().min(1, { message: "El género es requerido." }),
   fechanacimiento: z.date({ required_error: "La fecha de nacimiento es requerida." }),
-  rh: z.enum(RH, { required_error: "El RH es requerido." }),
+  rh: z.string().min(1, { message: "El RH es requerido." }),
   telefono: z.string().regex(/^\+?[0-9\s-()]{7,20}$/, { message: "Número de teléfono inválido." }),
 
   // Visit Details
@@ -81,3 +79,4 @@ export interface VisitorEntry extends VisitorFormData {
 export function toWritableArray<T extends string>(arr: readonly T[]): string[] {
   return [...arr];
 }
+

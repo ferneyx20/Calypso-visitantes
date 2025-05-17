@@ -26,7 +26,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Select ya no se usa directamente aquí para los campos que se vuelven Combobox
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -59,6 +60,9 @@ export default function VisitorsPage() {
   const [visitorEntries, setVisitorEntries] = useState<VisitorEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
+  const [generoOptions, setGeneroOptions] = useState<string[]>(toWritableArray(GENERO));
+  const [rhOptions, setRhOptions] = useState<string[]>(toWritableArray(RH));
   const [tipoVisitaOptions, setTipoVisitaOptions] = useState<string[]>(toWritableArray(TIPO_VISITA_OPTIONS));
   const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
   const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
@@ -217,12 +221,17 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Tipo de Documento</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={field.disabled}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Seleccione tipo" /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                  {TIPO_DOCUMENTO.map(tipo => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
+                              <Combobox
+                                options={tipoDocumentoOptions}
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onAddOption={(newOption) => handleAddOptionToList(newOption, tipoDocumentoOptions, setTipoDocumentoOptions)}
+                                placeholder="Seleccione o escriba tipo"
+                                searchPlaceholder="Buscar o agregar tipo..."
+                                emptyMessage="Tipo no encontrado. Puede agregarlo."
+                                addButtonLabel="Agregar tipo"
+                                disabled={field.disabled}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -266,12 +275,17 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Género</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={field.disabled}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Seleccione género" /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                  {GENERO.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
+                               <Combobox
+                                options={generoOptions}
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onAddOption={(newOption) => handleAddOptionToList(newOption, generoOptions, setGeneroOptions)}
+                                placeholder="Seleccione o escriba género"
+                                searchPlaceholder="Buscar o agregar género..."
+                                emptyMessage="Género no encontrado. Puede agregarlo."
+                                addButtonLabel="Agregar género"
+                                disabled={field.disabled}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -325,12 +339,17 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>RH</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={field.disabled}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Seleccione RH" /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                  {RH.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
+                              <Combobox
+                                options={rhOptions}
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onAddOption={(newOption) => handleAddOptionToList(newOption, rhOptions, setRhOptions)}
+                                placeholder="Seleccione o escriba RH"
+                                searchPlaceholder="Buscar o agregar RH..."
+                                emptyMessage="RH no encontrado. Puede agregarlo."
+                                addButtonLabel="Agregar RH"
+                                disabled={field.disabled}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -631,3 +650,4 @@ export default function VisitorsPage() {
     </div>
   );
 }
+
