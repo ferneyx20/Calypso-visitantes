@@ -1,3 +1,4 @@
+
 'use client';
 
 // Metadata export is not allowed in Client Components.
@@ -5,7 +6,7 @@
 // or rely on the root layout's metadata.
 
 import { SidebarProvider } from '@/components/ui/sidebar';
-import AppShell from '@/components/layout/app-shell';
+// AppShell se moverá a los layouts específicos de admin-dashboard y standard-dashboard
 
 export default function AppPagesLayout({
   children,
@@ -14,9 +15,9 @@ export default function AppPagesLayout({
 }>) {
   return (
     <SidebarProvider>
-      <AppShell>
-        {children}
-      </AppShell>
+      {/* AppShell ya no se renderiza aquí directamente. 
+          Se renderizará en /admin-dashboard/layout.tsx y /standard-dashboard/layout.tsx */}
+      {children}
     </SidebarProvider>
   );
 }
