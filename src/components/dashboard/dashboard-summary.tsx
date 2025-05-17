@@ -68,16 +68,23 @@ const generateMockVisits = (numVisits: number): Visit[] => {
 
 const ALL_MOCK_VISITS = generateMockVisits(150); // Generate 150 mock visits
 
-// Simulated user first name - in a real app, this would come from auth context
-const SIMULATED_USER_FIRST_NAME = "Admin"; // O "Usuario" para estándar
 
 export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummaryProps) {
   const [dateRange, setDateRange] = useState<string>("all_time");
   const [filteredVisits, setFilteredVisits] = useState<Visit[]>(ALL_MOCK_VISITS);
-  const [currentTime, setCurrentTime] = useState<string | null>(null);
+  const [greeting, setGreeting] = useState<string | null>(null);
   
+  const greetingUserFirstName = userRole === 'Estándar' ? "Usuario" : "Admin";
+
   useEffect(() => {
-    setCurrentTime(new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }));
+    const currentHour = new Date().getHours();
+    let timeOfDayGreeting = "Buenos días";
+    if (currentHour >= 12 && currentHour < 18) {
+      timeOfDayGreeting = "Buenas tardes";
+    } else if (currentHour >= 18 || currentHour < 5) { // Consider late night as "Buenas noches"
+      timeOfDayGreeting = "Buenas noches";
+    }
+    setGreeting(`${timeOfDayGreeting}, `);
   }, []);
 
 
@@ -127,14 +134,13 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
     const todayEnd = new Date();
     todayEnd.setHours(23,59,59,999);
     return ALL_MOCK_VISITS.filter(v => v.timestamp >= todayStart && v.timestamp <= todayEnd).length;
-  }, []); // Removed ALL_MOCK_VISITS dependency as it's constant after generation
+  }, []); 
 
-  // This would come from an actual count of active visitors in a real app
   const currentVisitors = useMemo(() => Math.floor(todayVisitors / 3) + 2, [todayVisitors]); 
 
   const totalSedes = MOCK_SEDES.length;
-  const totalEmpleadosAdmin = 78; // Simulated for Admin
-  const totalEmpleadosStandard = 15; // Simulated for Standard (same branch)
+  const totalEmpleadosAdmin = 78; 
+  const totalEmpleadosStandard = 15; 
 
 
   const visitsByBranchData: VisitData[] = useMemo(() => {
@@ -159,8 +165,6 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
       }));
   }, [filteredVisits]);
 
-  const greetingUserFirstName = userRole === 'Estándar' ? "Usuario" : "Admin";
-
 
   return (
     <section aria-labelledby="dashboard-summary-title" className="space-y-8 w-full">
@@ -183,10 +187,12 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
         </div>
       </div>
 
-      {currentTime && (
-        <div className="text-lg text-muted-foreground mb-6 flex items-center">
+      {greeting && (
+        <div className="text-lg text-muted-foreground mb-6 flex items-center justify-center text-center">
            <HandMetal className="mr-2 h-5 w-5 text-primary" />
-          ¡Buenos días, {greetingUserFirstName}! Son las {currentTime}.
+           {greeting}
+           <span className="font-semibold text-primary mx-1">{greetingUserFirstName}</span>
+           !
         </div>
       )}
       
