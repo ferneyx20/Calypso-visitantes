@@ -17,9 +17,9 @@ export async function loginAction(prevState: any, formData: FormData): Promise<L
   const identification = formData.get('identification') as string;
   const password = formData.get('password') as string;
 
-  // Simulate authentication with a CC and password
-  // For testing, let's use '123456789' as a mock CC
-  if (identification === '123456789' && password === 'password') {
+  // Simulate authentication with identification and password
+  // For testing, use 'admin' as identification and 'admin' as password
+  if (identification === 'admin' && password === 'admin') {
     // In a real app, generate a secure token and set httpOnly cookie
     cookies().set('mock_auth_token', 'mock_user_jwt_token', {
       // httpOnly: true, // httpOnly can't be easily tested with client-side redirects in mock, but good for real app
@@ -32,3 +32,4 @@ export async function loginAction(prevState: any, formData: FormData): Promise<L
     return { success: false, message: 'Número de identificación o contraseña incorrectos.' };
   }
 }
+
