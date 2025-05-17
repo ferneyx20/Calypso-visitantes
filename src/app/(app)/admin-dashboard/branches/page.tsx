@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Building2, Plus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const branchSchema = z.object({
+  id: z.string().optional(), // Para identificar en la lista
   name: z.string().min(3, { message: "El nombre de la sede debe tener al menos 3 caracteres." }),
   address: z.string().min(5, { message: "La dirección debe tener al menos 5 caracteres." }),
 });
@@ -24,6 +26,7 @@ type BranchFormData = z.infer<typeof branchSchema>;
 export default function BranchesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [branchesList, setBranchesList] = useState<BranchFormData[]>([]);
   const { toast } = useToast();
 
   const {
@@ -37,9 +40,11 @@ export default function BranchesPage() {
 
   const onSubmit: SubmitHandler<BranchFormData> = async (data) => {
     setIsSubmitting(true);
-    console.log("Nueva Sede:", data);
     // Simular llamada a API
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const newBranch = { ...data, id: `branch-${Date.now()}` };
+    setBranchesList(prev => [...prev, newBranch]);
 
     toast({
       title: "Sede Agregada",
@@ -51,7 +56,7 @@ export default function BranchesPage() {
   };
 
   return (
-    <div className="w-full flex flex-col flex-1 space-y-4">
+    <div className="w-full flex flex-col flex-1 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold flex items-center">
           <Building2 className="mr-3 h-8 w-8 text-primary" />
@@ -123,16 +128,41 @@ export default function BranchesPage() {
 
       <Card className="shadow-lg flex flex-col flex-1">
         <CardHeader>
-          <CardTitle>Administrar Sedes</CardTitle>
+          <CardTitle>Listado de Sedes</CardTitle>
           <CardDescription>
-            Aquí podrá crear, editar y eliminar las sedes de la organización.
-            La tabla de sedes aparecerá aquí.
+            Aquí podrá ver las sedes creadas.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
-          <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
-            <p className="text-muted-foreground">Próximamente: Tabla de Sedes</p>
-          </div>
+          {branchesList.length > 0 ? (
+            <div className="mt-4 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Dirección</TableHead>
+                    {/* <TableHead className="text-right">Acciones</TableHead> */}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {branchesList.map((branch) => (
+                    <TableRow key={branch.id}>
+                      <TableCell className="font-medium">{branch.name}</TableCell>
+                      <TableCell>{branch.address}</TableCell>
+                      {/* <TableCell className="text-right">
+                        <Button variant="ghost" size="icon"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                      </TableCell> */}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+              <p className="text-muted-foreground">No hay sedes creadas aún.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
