@@ -8,15 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, User, Lock } from 'lucide-react';
-import Link from 'next/link';
+import { Loader2, User, Lock, Eye, EyeOff } from 'lucide-react';
+// Link component is no longer needed
+// import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { loginAction, type LoginActionResult } from '@/app/(auth)/login/actions';
 
 
 const loginSchema = z.object({
-  identification: z.string().min(5, { message: 'Por favor, ingrese un número de identificación válido.' }),
+  identification: z.string().min(1, { message: 'Por favor, ingrese su identificación.' }), // Changed min to 1 as "admin" is short
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
 });
 
@@ -27,6 +28,7 @@ export default function LoginForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -39,7 +41,6 @@ export default function LoginForm() {
   const onSubmit: SubmitHandler<LoginFormInputs> = (data) => {
     setErrorMessage(null);
     startTransition(async () => {
-      // Create FormData to pass to server action
       const formData = new FormData();
       formData.append('identification', data.identification);
       formData.append('password', data.password);
@@ -51,8 +52,8 @@ export default function LoginForm() {
           title: 'Inicio de Sesión Exitoso',
           description: 'Redirigiendo al panel de control...',
         });
-        router.push('/'); // Redirect to dashboard
-        router.refresh(); // Refresh to apply cookie changes for middleware
+        router.push('/');
+        router.refresh();
       } else {
         setErrorMessage(result.message);
         toast({
@@ -62,6 +63,10 @@ export default function LoginForm() {
         });
       }
     });
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -87,11 +92,21 @@ export default function LoginForm() {
           <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             {...register('password')}
             placeholder="••••••••"
-            className="pl-10"
+            className="pl-10 pr-10" // Added pr-10 for the icon
           />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            onClick={togglePasswordVisibility}
+            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
         </div>
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
       </div>
@@ -110,11 +125,14 @@ export default function LoginForm() {
           'INICIAR SESIÓN'
         )}
       </Button>
+      {/* Removed "Forgot Password" Link */}
+      {/*
       <div className="text-center">
         <Link href="#" className="text-sm text-primary hover:underline">
           ¿Olvidó su contraseña?
         </Link>
       </div>
+      */}
     </form>
   );
 }
