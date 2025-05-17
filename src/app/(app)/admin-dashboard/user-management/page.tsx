@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserCog, Users, Search, PlusCircle, Edit3, ShieldCheck, ShieldAlert, Loader2, Settings2 } from "lucide-react";
+import { UserCog, Users, Search, ShieldCheck, ShieldAlert, Loader2, UserX, UserCheck as UserCheckIcon } from "lucide-react"; // Added UserX, UserCheckIcon
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,8 +16,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
-// Simulación de un empleado existente que puede ser convertido a usuario
+
 interface SearchableEmployee {
   id: string;
   identificacion: string;
@@ -26,17 +27,21 @@ interface SearchableEmployee {
   sede: string;
 }
 
-// Simulación de un usuario de la plataforma
 interface PlatformUser extends SearchableEmployee {
   userId: string;
   role: "Administrador" | "Estándar";
   canManageAutoregister: boolean;
+  isActive: boolean; // Nuevo campo
 }
 
 const MOCK_SEARCHABLE_EMPLOYEES: SearchableEmployee[] = [
   { id: "emp-1", identificacion: "11223344", nombreApellido: "Ana García", cargo: "Gerente de Ventas", sede: "Sede Principal" },
   { id: "emp-2", identificacion: "55667788", nombreApellido: "Luis Torres", cargo: "Desarrollador Senior", sede: "Sede Norte" },
   { id: "emp-3", identificacion: "99001122", nombreApellido: "Sofia Chen", cargo: "Analista de Marketing", sede: "Sede Centro" },
+  { id: "emp-4", identificacion: "12121212", nombreApellido: "Mario Bro", cargo: "Plomero", sede: "Sede Principal" },
+  { id: "emp-5", identificacion: "34343434", nombreApellido: "Luigi Sis", cargo: "Ayudante Plomero", sede: "Sede Norte" },
+  { id: "emp-6", identificacion: "56565656", nombreApellido: "Peach Queen", cargo: "Reina", sede: "Sede Principal" },
+  { id: "emp-7", identificacion: "78787878", nombreApellido: "Bowser King", cargo: "Villano", sede: "Sede Sur" },
 ];
 
 const userRoleSchema = z.object({
@@ -49,7 +54,7 @@ type UserRoleFormData = z.infer<typeof userRoleSchema>;
 
 export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchableEmployee[]>(MOCK_SEARCHABLE_EMPLOYEES); // Inicialmente muestra todos
+  const [searchResults, setSearchResults] = useState<SearchableEmployee[]>(MOCK_SEARCHABLE_EMPLOYEES);
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<SearchableEmployee | null>(null);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
@@ -64,10 +69,9 @@ export default function UserManagementPage() {
     const term = event.target.value.toLowerCase();
     setSearchTerm(term);
     if (!term) {
-      setSearchResults(MOCK_SEARCHABLE_EMPLOYEES); // Mostrar todos si no hay término
+      setSearchResults(MOCK_SEARCHABLE_EMPLOYEES);
       return;
     }
-    // Simulación de búsqueda
     setSearchResults(
       MOCK_SEARCHABLE_EMPLOYEES.filter(
         emp => emp.nombreApellido.toLowerCase().includes(term) || emp.identificacion.includes(term)
@@ -80,7 +84,7 @@ export default function UserManagementPage() {
     roleForm.reset({
       employeeId: employee.id,
       employeeName: employee.nombreApellido,
-      role: undefined, // Forzar selección
+      role: undefined,
     });
     setIsRoleDialogOpen(true);
   };
@@ -88,18 +92,16 @@ export default function UserManagementPage() {
   const onAssignRoleSubmit: SubmitHandler<UserRoleFormData> = async (data) => {
     if (!selectedEmployee) return;
     setIsSubmittingRole(true);
-    // Simular API call
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const newPlatformUser: PlatformUser = {
       ...selectedEmployee,
       userId: `user-${Date.now()}`,
       role: data.role,
-      canManageAutoregister: data.role === "Administrador", // Admins can manage by default
+      canManageAutoregister: data.role === "Administrador",
+      isActive: true, // Nuevo usuario es activo por defecto
     };
-    setPlatformUsers(prev => [...prev, newPlatformUser]);
-    // Opcional: remover de searchResults si ya fue convertido
-    // setSearchResults(prev => prev.filter(emp => emp.id !== selectedEmployee.id));
+    setPlatformUsers(prev => [newPlatformUser, ...prev]); // Añadir al inicio para verlo si la lista es larga
 
     toast({
       title: "Usuario Creado",
@@ -122,6 +124,25 @@ export default function UserManagementPage() {
     });
   };
 
+  const handleToggleUserStatus = (userId: string) => {
+    let userName = "Usuario";
+    let newStatus = false;
+    setPlatformUsers(prevUsers =>
+      prevUsers.map(u => {
+        if (u.userId === userId) {
+          userName = u.nombreApellido;
+          newStatus = !u.isActive;
+          return { ...u, isActive: !u.isActive };
+        }
+        return u;
+      })
+    );
+     toast({
+      title: `Usuario ${newStatus ? "Activado" : "Inactivado"}`,
+      description: `${userName} ha sido ${newStatus ? "activado" : "inactivado"}.`,
+    });
+  };
+
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
@@ -130,14 +151,13 @@ export default function UserManagementPage() {
           <UserCog className="mr-3 h-8 w-8 text-primary" />
           Gestión de Usuarios
         </h1>
-        {/* Podría haber un botón para crear usuarios administradores directamente si es necesario */}
       </div>
 
       <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Buscar Empleados para Convertir en Usuarios</CardTitle>
           <CardDescription>
-            Busque empleados existentes por nombre o identificación para asignarles un rol y acceso a la plataforma.
+            Busque empleados existentes por nombre o identificación para asignarles un rol (máximo 5 mostrados).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -164,7 +184,7 @@ export default function UserManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {searchResults.map((emp) => (
+                  {searchResults.slice(0, 5).map((emp) => (
                     <TableRow key={emp.id}>
                       <TableCell>{emp.identificacion}</TableCell>
                       <TableCell className="font-medium">{emp.nombreApellido}</TableCell>
@@ -180,10 +200,15 @@ export default function UserManagementPage() {
                   ))}
                 </TableBody>
               </Table>
+              {searchResults.length > 5 && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Mostrando 5 de {searchResults.length} empleados. Refine su búsqueda.
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-4">
-              {searchTerm ? "No se encontraron empleados." : "Ingrese un término para buscar empleados."}
+              {searchTerm ? "No se encontraron empleados." : "Ingrese un término para buscar empleados o vea la lista inicial (máx. 5)."}
             </p>
           )}
         </CardContent>
@@ -193,7 +218,7 @@ export default function UserManagementPage() {
         <CardHeader>
           <CardTitle>Usuarios de la Plataforma</CardTitle>
           <CardDescription>
-            Lista de empleados que tienen acceso a la plataforma, sus roles y permisos.
+            Lista de empleados con acceso a la plataforma, sus roles y permisos (máximo 5 mostrados).
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
@@ -206,16 +231,19 @@ export default function UserManagementPage() {
                     <TableHead>Identificación</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Permiso Autoregistro</TableHead>
-                    {/* <TableHead className="text-right">Acciones</TableHead> */}
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {platformUsers.map((user) => (
-                    <TableRow key={user.userId}>
+                  {platformUsers.slice(0, 5).map((user) => (
+                    <TableRow key={user.userId} className={cn(!user.isActive && "opacity-60")}>
                       <TableCell className="font-medium">{user.nombreApellido}</TableCell>
                        <TableCell>{user.identificacion}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === "Administrador" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", 
+                          user.role === "Administrador" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
+                          !user.isActive && "bg-gray-200 text-gray-500"
+                        )}>
                           {user.role === "Administrador" ? <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> : <Users className="mr-1.5 h-3.5 w-3.5" />}
                           {user.role}
                         </span>
@@ -227,19 +255,33 @@ export default function UserManagementPage() {
                             checked={user.canManageAutoregister}
                             onCheckedChange={(checked) => handleToggleAutoregisterPermission(user.userId, checked)}
                             aria-label={`Permiso de autoregistro para ${user.nombreApellido}`}
+                            disabled={!user.isActive}
                           />
-                          <Label htmlFor={`autoregister-${user.userId}`} className="text-xs">
+                          <Label htmlFor={`autoregister-${user.userId}`} className={cn("text-xs", !user.isActive && "text-muted-foreground/50")}>
                             {user.canManageAutoregister ? "Permitido" : "Denegado"}
                           </Label>
                         </div>
                       </TableCell>
-                      {/* <TableCell className="text-right">
-                        <Button variant="ghost" size="icon"><Edit3 className="h-4 w-4" /></Button>
-                      </TableCell> */}
+                      <TableCell className="text-right">
+                        <Button 
+                          variant={user.isActive ? "outline" : "secondary"} 
+                          size="sm" 
+                          onClick={() => handleToggleUserStatus(user.userId)}
+                          className="w-28"
+                        >
+                          {user.isActive ? <UserX className="mr-2 h-4 w-4" /> : <UserCheckIcon className="mr-2 h-4 w-4" />}
+                          {user.isActive ? "Inactivar" : "Activar"}
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+               {platformUsers.length > 5 && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Mostrando 5 de {platformUsers.length} usuarios de plataforma.
+                </p>
+              )}
             </div>
           ) : (
             <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
@@ -249,7 +291,6 @@ export default function UserManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Diálogo para Asignar Rol */}
       <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -305,3 +346,5 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
+    

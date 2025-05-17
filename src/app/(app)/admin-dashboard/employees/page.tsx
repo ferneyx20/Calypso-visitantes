@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search } from "lucide-react"; // Added Search icon
+import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -56,6 +56,7 @@ export default function EmployeesPage() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Simular carga de sedes disponibles (en una app real, esto vendría de una API)
     setAvailableSedes(SIMULATED_SEDES);
   }, []);
 
@@ -81,7 +82,7 @@ export default function EmployeesPage() {
           variant: "destructive",
         });
         setSelectedFile(null);
-        event.target.value = "";
+        event.target.value = ""; // Reset file input
       }
     }
   };
@@ -96,6 +97,7 @@ export default function EmployeesPage() {
       return;
     }
     setIsUploading(true);
+    // Simular carga de archivo
     await new Promise(resolve => setTimeout(resolve, 2000));
     setIsUploading(false);
     toast({
@@ -109,6 +111,7 @@ export default function EmployeesPage() {
 
   const onManualSubmit: SubmitHandler<EmployeeFormData> = async (data) => {
     setIsSubmittingManual(true);
+    // Simular llamada a API
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     const newEmployee = { ...data, id: `emp-${Date.now()}` };
@@ -224,7 +227,7 @@ export default function EmployeesPage() {
                         </FormControl>
                         <SelectContent>
                           {availableSedes.map((sede) => (
-                            <SelectItem key={sede.id} value={sede.name}>
+                            <SelectItem key={sede.id} value={sede.name}> {/* Usar sede.name como valor para consistencia con lo que se guarda */}
                               {sede.name}
                             </SelectItem>
                           ))}
@@ -261,7 +264,7 @@ export default function EmployeesPage() {
         <CardHeader>
           <CardTitle>Lista de Empleados</CardTitle>
           <CardDescription>
-            Aquí se mostrará la tabla con los empleados registrados. Puede buscar por nombre o identificación.
+            Aquí se mostrará la tabla con los empleados registrados (máximo 5 mostrados). Puede buscar por nombre o identificación.
           </CardDescription>
           <div className="flex items-center gap-2 pt-4">
             <Search className="h-5 w-5 text-muted-foreground" />
@@ -275,11 +278,11 @@ export default function EmployeesPage() {
           </div>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
-           {employeesList.length === 0 ? (
+           {employeesList.length === 0 && !searchTerm ? (
             <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
               <p className="text-muted-foreground">No hay empleados registrados aún.</p>
             </div>
-           ) : filteredEmployees.length === 0 ? (
+           ) : filteredEmployees.length === 0 && searchTerm ? (
             <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
               <p className="text-muted-foreground">No se encontraron empleados que coincidan con su búsqueda.</p>
             </div>
@@ -295,7 +298,7 @@ export default function EmployeesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.map((employee) => (
+                  {filteredEmployees.slice(0, 5).map((employee) => (
                     <TableRow key={employee.id}>
                       <TableCell>{employee.identificacion}</TableCell>
                       <TableCell className="font-medium">{employee.nombreApellido}</TableCell>
@@ -305,6 +308,11 @@ export default function EmployeesPage() {
                   ))}
                 </TableBody>
               </Table>
+              {filteredEmployees.length > 5 && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Mostrando 5 de {filteredEmployees.length} empleados. Refine su búsqueda para ver más.
+                </p>
+              )}
             </div>
           )}
         </CardContent>
@@ -367,3 +375,5 @@ export default function EmployeesPage() {
     </div>
   );
 }
+
+    
