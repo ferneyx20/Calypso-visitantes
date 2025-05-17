@@ -25,7 +25,7 @@
     --accent: 264 95% 79%; /* Vivid Purple #BB86FC */
     --accent-foreground: 0 0% 100%; /* White text for accent */
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84.2% 60.2%; /* Standard Red, suitable for login button */
     --destructive-foreground: 0 0% 98%;
 
     --border: 206 50% 88%;
@@ -48,6 +48,10 @@
     --sidebar-accent-foreground: 210 12% 25%;
     --sidebar-border: 206 50% 85%;
     --sidebar-ring: 207 100% 73%;
+
+    /* Custom colors for login page */
+    --calypso-red: 355 78% 51%; /* #E3232F */
+    --calypso-orange-red: 6 80% 57%; /* #E84C3D */
   }
 
   .dark {
@@ -72,7 +76,7 @@
     --accent: 264 95% 79%; /* Vivid Purple */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 72.2% 50.6%; /* Darker Red for destructive actions */
     --destructive-foreground: 0 0% 98%;
 
     --border: 210 10% 35%;
@@ -93,6 +97,10 @@
     --sidebar-accent-foreground: 206 80% 93%;
     --sidebar-border: 210 10% 25%;
     --sidebar-ring: 207 100% 73%;
+
+    /* Custom colors for login page - dark theme (optional, can be same as light) */
+    --calypso-red: 355 78% 51%;
+    --calypso-orange-red: 6 80% 57%;
   }
 }
 
