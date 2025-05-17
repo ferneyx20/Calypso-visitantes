@@ -2,10 +2,11 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import QRCode from "qrcode.react";
 import {
   visitorRegistrationSchema,
   type VisitorFormData,
@@ -20,21 +21,17 @@ import {
 } from "./schemas";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Combobox } from "@/components/ui/combobox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Loader2, Lightbulb, CalendarIcon, LogOut, Users, UserCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { Plus, Search, Loader2, LogOut, Users, Link as LinkIcon, QrCode } from "lucide-react";
+import VisitorRegistrationFormFields from "@/components/visitor/visitor-registration-form-fields";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+
 
 // Simulación de empleados
 const SIMULATED_EMPLOYEES = [
@@ -60,12 +57,15 @@ const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) =
 
 export default function VisitorsPage() {
   const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
+  const [isAutoregisterDialogOpen, setIsAutoregisterDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
   const [visitorEntries, setVisitorEntries] = useState<VisitorEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [autoregisterEnabled, setAutoregisterEnabled] = useState(true);
+  const [autoregisterUrl, setAutoregisterUrl] = useState("");
 
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
   const [generoOptions, setGeneroOptions] = useState<string[]>(toWritableArray(GENERO));
@@ -74,9 +74,11 @@ export default function VisitorsPage() {
   const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
   const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
   
-  // Options for "Persona a Visitar" combobox
-  const employeeOptions = useMemo(() => 
-    SIMULATED_EMPLOYEES.map(emp => emp.name), 
+  const employeeComboboxOptions = useMemo(() => 
+    SIMULATED_EMPLOYEES.map(emp => ({
+      value: emp.id,
+      label: `${emp.name} (ID: ${emp.identification})`,
+    })), 
   []);
 
   const form = useForm<VisitorFormData>({
@@ -98,6 +100,12 @@ export default function VisitorsPage() {
   });
 
   const purposeValue = form.watch("purpose");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAutoregisterUrl(`${window.location.origin}/autoregistro`);
+    }
+  }, []);
 
   const fetchCategorySuggestion = useCallback(async (purposeText: string) => {
     if (purposeText.trim().length < 10) {
@@ -156,7 +164,7 @@ export default function VisitorsPage() {
       description: `${data.nombres} ${data.apellidos} ha sido registrado(a).`,
     });
     setIsSubmitting(false);
-    setIsDialogOpen(false);
+    setIsRegisterDialogOpen(false);
     form.reset();
     setSuggestedCategory(null);
   };
@@ -200,14 +208,6 @@ export default function VisitorsPage() {
       setOptionsList(prev => [...prev, optionValue]);
     }
   };
-  
-  const employeeComboboxOptions = useMemo(() => {
-    return SIMULATED_EMPLOYEES.map(emp => ({
-      value: emp.id, // Use a unique ID as value
-      label: `${emp.name} (ID: ${emp.identification})`, // Display name and ID
-    }));
-  }, []);
-
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
@@ -216,411 +216,115 @@ export default function VisitorsPage() {
           <Users className="mr-3 h-8 w-8 text-primary" />
           Gestión de Visitantes
         </h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Registrar Visita
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Registrar Nueva Visita</DialogTitle>
-              <DialogDescription>Complete todos los campos para registrar al visitante.</DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)}>
-                <ScrollArea className="h-[60vh] p-1 pr-4">
-                  <div className="space-y-6 p-2">
-                    {/* Información Personal del Visitante */}
-                    <Card>
-                      <CardHeader><CardTitle className="text-lg">Información Personal del Visitante</CardTitle></CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="tipodocumento"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Tipo de Documento</FormLabel>
-                              <Combobox
-                                options={tipoDocumentoOptions}
-                                value={field.value || ""}
-                                onChange={field.onChange}
-                                onAddOption={(newOption) => handleAddOptionToList(newOption, tipoDocumentoOptions, setTipoDocumentoOptions)}
-                                placeholder="Seleccione o escriba tipo"
-                                searchPlaceholder="Buscar o agregar tipo..."
-                                emptyMessage="Tipo no encontrado. Puede agregarlo."
-                                addButtonLabel="Agregar tipo"
-                                disabled={field.disabled}
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="numerodocumento"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Número de Documento</FormLabel>
-                              <FormControl><Input placeholder="Ej: 123456789" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="nombres"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nombres</FormLabel>
-                              <FormControl><Input placeholder="Ej: Ana María" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="apellidos"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Apellidos</FormLabel>
-                              <FormControl><Input placeholder="Ej: Pérez Gómez" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="genero"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Género</FormLabel>
-                               <Combobox
-                                options={generoOptions}
-                                value={field.value || ""}
-                                onChange={field.onChange}
-                                onAddOption={(newOption) => handleAddOptionToList(newOption, generoOptions, setGeneroOptions)}
-                                placeholder="Seleccione o escriba género"
-                                searchPlaceholder="Buscar o agregar género..."
-                                emptyMessage="Género no encontrado. Puede agregarlo."
-                                addButtonLabel="Agregar género"
-                                disabled={field.disabled}
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="fechanacimiento"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                              <FormLabel className="mb-1.5">Fecha de Nacimiento</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant={"outline"}
-                                      className={cn(
-                                        "w-full pl-3 text-left font-normal",
-                                        !field.value && "text-muted-foreground"
-                                      )}
-                                      disabled={field.disabled}
-                                    >
-                                      {field.value ? (
-                                        format(field.value, "PPP", { locale: es })
-                                      ) : (
-                                        <span>Seleccione una fecha</span>
-                                      )}
-                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    disabled={(date) =>
-                                      date > new Date() || date < new Date("1900-01-01")
-                                    }
-                                    initialFocus
-                                    locale={es}
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="rh"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>RH</FormLabel>
-                              <Combobox
-                                options={rhOptions}
-                                value={field.value || ""}
-                                onChange={field.onChange}
-                                onAddOption={(newOption) => handleAddOptionToList(newOption, rhOptions, setRhOptions)}
-                                placeholder="Seleccione o escriba RH"
-                                searchPlaceholder="Buscar o agregar RH..."
-                                emptyMessage="RH no encontrado. Puede agregarlo."
-                                addButtonLabel="Agregar RH"
-                                disabled={field.disabled}
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="telefono"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Teléfono</FormLabel>
-                              <FormControl><Input type="tel" placeholder="Ej: 3001234567" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
+        <div className="flex gap-2">
+          <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="mr-2 h-4 w-4" />
+                Registrar Visita
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Registrar Nueva Visita</DialogTitle>
+                <DialogDescription>Complete todos los campos para registrar al visitante.</DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)}>
+                  <VisitorRegistrationFormFields
+                    form={form}
+                    isCategorizing={isCategorizing}
+                    suggestedCategory={suggestedCategory}
+                    tipoDocumentoOptions={tipoDocumentoOptions}
+                    onAddTipoDocumento={(newOption) => handleAddOptionToList(newOption, tipoDocumentoOptions, setTipoDocumentoOptions)}
+                    generoOptions={generoOptions}
+                    onAddGenero={(newOption) => handleAddOptionToList(newOption, generoOptions, setGeneroOptions)}
+                    rhOptions={rhOptions}
+                    onAddRh={(newOption) => handleAddOptionToList(newOption, rhOptions, setRhOptions)}
+                    tipoVisitaOptions={tipoVisitaOptions}
+                    onAddTipoVisita={(newOption) => handleAddOptionToList(newOption, tipoVisitaOptions, setTipoVisitaOptions)}
+                    arlOptions={arlOptions}
+                    onAddArl={(newOption) => handleAddOptionToList(newOption, arlOptions, setArlOptions)}
+                    epsOptions={epsOptions}
+                    onAddEps={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
+                    employeeComboboxOptions={employeeComboboxOptions}
+                  />
+                  <DialogFooter className="pt-6 pr-2">
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isSubmitting || isCategorizing}>
+                      {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</>) : "Guardar Visita"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
 
-                    {/* Detalles de la Visita */}
-                    <Card>
-                      <CardHeader><CardTitle className="text-lg">Detalles de la Visita</CardTitle></CardHeader>
-                      <CardContent className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="personavisitada"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Persona a Visitar</FormLabel>
-                               <Combobox
-                                options={employeeComboboxOptions.map(opt => opt.label)} // Use labels for display
-                                value={
-                                  employeeComboboxOptions.find(opt => opt.label === field.value)?.label || field.value || ""
-                                }
-                                onChange={(selectedLabel) => {
-                                   field.onChange(selectedLabel); // Store the label/name
-                                }}
-                                placeholder="Buscar empleado por nombre o ID..."
-                                searchPlaceholder="Escriba nombre o ID del empleado..."
-                                emptyMessage="Empleado no encontrado."
-                                // onAddOption not applicable here as we're selecting existing employees
-                                disabled={field.disabled}
-                                // Custom icon or indicator
-                                icon={<UserCheck className="mr-2 h-4 w-4 text-primary" />}
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="purpose"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Propósito de la Visita</FormLabel>
-                              <FormControl><Textarea placeholder="Ej: Reunión de seguimiento, Entrega de documentos" {...field} rows={3} /></FormControl>
-                              {isCategorizing && <FormDescription className="flex items-center"><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Sugiriendo categoría...</FormDescription>}
-                              {suggestedCategory && !isCategorizing && (
-                                <FormDescription className="flex items-center gap-1 pt-1">
-                                  <Lightbulb className="h-3 w-3 text-yellow-500" />
-                                  <span>Sugerencia:</span>
-                                  <Badge variant="secondary" className="cursor-default">{suggestedCategory}</Badge>
-                                </FormDescription>
-                              )}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                         <FormField
-                          control={form.control}
-                          name="category"
-                          render={({ field }) => (
-                            <FormItem className="hidden">
-                              <FormControl><Input {...field} /></FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="tipovisita"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Tipo de Visita</FormLabel>
-                              <Combobox
-                                options={tipoVisitaOptions}
-                                value={field.value || ""}
-                                onChange={field.onChange}
-                                onAddOption={(newOption) => handleAddOptionToList(newOption, tipoVisitaOptions, setTipoVisitaOptions)}
-                                placeholder="Seleccione o escriba tipo"
-                                searchPlaceholder="Buscar o agregar tipo..."
-                                emptyMessage="Tipo no encontrado. Puede agregarlo."
-                                addButtonLabel="Agregar tipo"
-                                disabled={field.disabled}
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader><CardTitle className="text-lg">Información Adicional (Opcional)</CardTitle></CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="empresaProviene"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Empresa de Origen</FormLabel>
-                              <FormControl><Input placeholder="Ej: Acme Corp" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="numerocarnet"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Número de Carnet/Identificación Empresa</FormLabel>
-                              <FormControl><Input placeholder="Ej: E-12345" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="vehiculoPlaca"
-                          render={({ field }) => (
-                            <FormItem className="md:col-span-2">
-                              <FormLabel>Placa del Vehículo</FormLabel>
-                              <FormControl><Input placeholder="Ej: XYZ123" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader><CardTitle className="text-lg">Salud y Seguridad</CardTitle></CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="arl"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>ARL</FormLabel>
-                               <Combobox
-                                options={arlOptions}
-                                value={field.value || ""}
-                                onChange={field.onChange}
-                                onAddOption={(newOption) => handleAddOptionToList(newOption, arlOptions, setArlOptions)}
-                                placeholder="Seleccione o escriba ARL"
-                                searchPlaceholder="Buscar o agregar ARL..."
-                                emptyMessage="ARL no encontrada. Puede agregarla."
-                                addButtonLabel="Agregar ARL"
-                                disabled={field.disabled}
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="eps"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>EPS</FormLabel>
-                              <Combobox
-                                options={epsOptions}
-                                value={field.value || ""}
-                                onChange={field.onChange}
-                                onAddOption={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
-                                placeholder="Seleccione o escriba EPS"
-                                searchPlaceholder="Buscar o agregar EPS..."
-                                emptyMessage="EPS no encontrada. Puede agregarla."
-                                addButtonLabel="Agregar EPS"
-                                disabled={field.disabled}
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader><CardTitle className="text-lg">Contacto de Emergencia</CardTitle></CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="contactoemergencianombre"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nombres</FormLabel>
-                              <FormControl><Input placeholder="Ej: Carlos" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="contactoemergenciaapellido"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Apellidos</FormLabel>
-                              <FormControl><Input placeholder="Ej: Rodríguez" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="contactoemergenciatelefono"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Teléfono</FormLabel>
-                              <FormControl><Input type="tel" placeholder="Ej: 3109876543" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="contactoemergenciaparentesco"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Parentesco</FormLabel>
-                              <FormControl><Input placeholder="Ej: Hermano, Esposa" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
+          <Dialog open={isAutoregisterDialogOpen} onOpenChange={setIsAutoregisterDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <LinkIcon className="mr-2 h-4 w-4" />
+                Autoregistro
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center"><QrCode className="mr-2 h-5 w-5 text-primary"/> Opciones de Autoregistro</DialogTitle>
+                <DialogDescription>
+                  Use el código QR o el enlace para que los visitantes se registren ellos mismos.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="flex items-center justify-center">
+                  {autoregisterUrl ? (
+                    <QRCode value={autoregisterUrl} size={192} level="H" />
+                  ) : (
+                    <div className="h-48 w-48 flex items-center justify-center bg-muted rounded-md">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  )}
+                </div>
+                {autoregisterUrl && (
+                  <div className="space-y-1 text-center">
+                    <Label htmlFor="autoregister-link" className="text-sm font-medium">Enlace de Autoregistro:</Label>
+                    <Input
+                      id="autoregister-link"
+                      type="text"
+                      value={autoregisterUrl}
+                      readOnly
+                      className="text-center"
+                    />
+                     <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(autoregisterUrl).then(() => toast({ title: "Enlace copiado" }))}>
+                      Copiar Enlace
+                    </Button>
                   </div>
-                </ScrollArea>
-                <DialogFooter className="pt-6 pr-2">
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={isSubmitting || isCategorizing}>
-                    {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</>) : "Guardar Visita"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                )}
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="autoregister-toggle" className="text-base">
+                      Activar Autoregistro
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Permite a los visitantes usar el enlace/QR.
+                    </p>
+                  </div>
+                  <Switch
+                    id="autoregister-toggle"
+                    checked={autoregisterEnabled}
+                    onCheckedChange={setAutoregisterEnabled}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button">Cerrar</Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card className="shadow-lg flex flex-col flex-1">
@@ -669,7 +373,7 @@ export default function VisitorsPage() {
                       <TableCell>{visitor.tipodocumento}</TableCell>
                       <TableCell>{visitor.numerodocumento}</TableCell>
                       <TableCell>{visitor.personavisitada}</TableCell>
-                      <TableCell>{format(visitor.horaentrada, "Pp", { locale: es })}</TableCell>
+                      <TableCell>{format(new Date(visitor.horaentrada), "Pp", { locale: es })}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" onClick={() => handleMarkExit(visitor.id)}>
                           <LogOut className="mr-2 h-4 w-4"/> Marcar Salida

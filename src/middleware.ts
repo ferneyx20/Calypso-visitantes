@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 const MOCK_AUTH_COOKIE_NAME = 'mock_auth_token';
 const LOGIN_PATH = '/login';
 const APP_ROOT_PATH = '/admin-dashboard'; // Updated APP_ROOT_PATH
+const PUBLIC_PATHS = ['/autoregistro']; // Rutas públicas además del login
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -15,11 +16,16 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') || // Covers _next/static and _next/image
     pathname.endsWith('.ico') ||
-    pathname.endsWith('.png') || // Basic image types, can be expanded
+    pathname.endsWith('.png') || 
     pathname.endsWith('.jpg') ||
     pathname.endsWith('.jpeg') ||
-    pathname.startsWith('/images/') // Assuming a public/images folder
+    pathname.startsWith('/images/') 
   ) {
+    return NextResponse.next();
+  }
+
+  // Allow access to explicitly defined public paths
+  if (PUBLIC_PATHS.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
@@ -31,13 +37,9 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(APP_ROOT_PATH, request.url));
     }
   } else {
-    // If not authenticated and not on /login page, redirect to /login
+    // If not authenticated and not on /login page (and not other public paths), redirect to /login
     if (pathname !== LOGIN_PATH) {
-      // Preserve search params if any, e.g., for redirecting after login
       const redirectUrl = new URL(LOGIN_PATH, request.url);
-      // if (pathname !== APP_ROOT_PATH) { // Avoid adding callbackUrl if already at root
-      //    // redirectUrl.searchParams.set('callbackUrl', request.nextUrl.href);
-      // }
       return NextResponse.redirect(redirectUrl);
     }
   }
