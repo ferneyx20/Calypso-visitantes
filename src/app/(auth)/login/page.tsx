@@ -6,24 +6,15 @@ export default function LoginPage() {
     <div className="flex min-h-screen">
       {/* Left Panel */}
       <div
-        className="relative hidden w-1/2 flex-col items-center justify-center bg-card text-white lg:flex"
+        className="relative hidden w-1/2 flex-col items-center justify-center bg-card text-foreground lg:flex"
         style={{ backgroundColor: 'hsl(var(--calypso-red))' }}
       >
         <div className="absolute inset-0 bg-black opacity-25" /> {/* Optional overlay */}
         <div className="z-10 text-center p-8">
-          {/* Placeholder for the new main image/logo if desired */}
-          {/* <Image
-            src="https://placehold.co/200x200.png"
-            alt="Visitor Management System Icon"
-            width={150}
-            height={150}
-            className="mx-auto mb-6 rounded-full"
-            data-ai-hint="system icon"
-          /> */}
           <h1 className="text-4xl font-bold">
             GESTIÓN DE <span className="font-semibold">VISITANTES</span>
           </h1>
-          <p className="mt-3 text-lg text-gray-200">
+          <p className="mt-3 text-lg" style={{ color: 'hsl(var(--primary-foreground))' }}>
             Eficiencia y seguridad en el acceso.
           </p>
         </div>
@@ -32,12 +23,16 @@ export default function LoginPage() {
       {/* Right Panel (Login Form) */}
       <div className="flex w-full flex-col items-center justify-center bg-background p-8 lg:w-1/2">
         <div className="mb-10 self-start">
+          {/* 
+            Asegúrate de colocar tu imagen 'pelican_logo.png' 
+            en la carpeta 'public/images/' de tu proyecto.
+          */}
           <Image
-            src="https://placehold.co/120x120.png"
+            src="/images/pelican_logo.png" // Ruta a la imagen en la carpeta public
             alt="Logo de la Empresa"
             width={120}
             height={120}
-            data-ai-hint="pelican logo"
+            priority // Cargar la imagen con prioridad ya que es importante para el LCP
           />
         </div>
         <div className="w-full max-w-sm">
