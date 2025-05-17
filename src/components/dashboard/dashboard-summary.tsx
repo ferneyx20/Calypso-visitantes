@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Briefcase, Clock, Building, UserSquare, CalendarDays, BarChart3, ListOrdered, HandMetal } from "lucide-react";
+import { Users, Briefcase, Clock, Building, UserSquare, CalendarDays, BarChart3, ListOrdered, HandMetal, Sun, Moon } from "lucide-react"; // Added Sun, Moon
 import SummaryCard from "./summary-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import VisitsByBranchChart, { type VisitData } from "./VisitsByBranchChart";
@@ -73,18 +73,24 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
   const [dateRange, setDateRange] = useState<string>("all_time");
   const [filteredVisits, setFilteredVisits] = useState<Visit[]>(ALL_MOCK_VISITS);
   const [greeting, setGreeting] = useState<string | null>(null);
+  const [greetingIcon, setGreetingIcon] = useState<React.ReactNode | null>(null);
   
   const greetingUserFirstName = userRole === 'Estándar' ? "Usuario" : "Admin";
 
   useEffect(() => {
     const currentHour = new Date().getHours();
     let timeOfDayGreeting = "Buenos días";
+    let icon: React.ReactNode = <Sun className="mr-2 h-6 w-6 text-primary" />;
+
     if (currentHour >= 12 && currentHour < 18) {
       timeOfDayGreeting = "Buenas tardes";
-    } else if (currentHour >= 18 || currentHour < 5) { // Consider late night as "Buenas noches"
+      icon = <Sun className="mr-2 h-6 w-6 text-primary" />;
+    } else if (currentHour >= 18 || currentHour < 5) { 
       timeOfDayGreeting = "Buenas noches";
+      icon = <Moon className="mr-2 h-6 w-6 text-primary" />;
     }
-    setGreeting(`${timeOfDayGreeting}, `);
+    setGreeting(timeOfDayGreeting);
+    setGreetingIcon(icon);
   }, []);
 
 
@@ -187,10 +193,10 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
         </div>
       </div>
 
-      {greeting && (
-        <div className="text-lg text-muted-foreground mb-6 flex items-center justify-center text-center">
-           <HandMetal className="mr-2 h-5 w-5 text-primary" />
-           {greeting}
+      {greeting && greetingIcon && (
+        <div className="text-xl text-muted-foreground mb-6 flex items-center justify-center text-center py-2"> {/* Increased font size and added padding */}
+           {greetingIcon}
+           {greeting},
            <span className="font-semibold text-primary mx-1">{greetingUserFirstName}</span>
            !
         </div>
