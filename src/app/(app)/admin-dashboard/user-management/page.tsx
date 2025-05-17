@@ -1,13 +1,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { UsersCog } from "lucide-react"; // O usa Settings si prefieres
+import { UserCog } from "lucide-react"; // O usa Settings si prefieres
 
 export default function UserManagementPage() {
   return (
     <div className="w-full flex flex-col flex-1 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold flex items-center">
-          <UsersCog className="mr-3 h-8 w-8 text-primary" /> {/* O Settings */}
+          <UserCog className="mr-3 h-8 w-8 text-primary" /> {/* O Settings */}
           Gestión de Usuarios
         </h1>
         {/* Aquí podrías añadir un botón para "Agregar Usuario" en el futuro */}
