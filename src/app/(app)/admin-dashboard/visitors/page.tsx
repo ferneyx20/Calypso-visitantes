@@ -64,7 +64,11 @@ export default function VisitorsPage() {
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
   const [visitorEntries, setVisitorEntries] = useState<VisitorEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [autoregisterEnabled, setAutoregisterEnabled] = useState(true);
+  
+  // Simulación del permiso del usuario actual para gestionar el autoregistro
+  // En una app real, esto vendría del estado del usuario autenticado.
+  const [currentUserCanManageAutoregister, setCurrentUserCanManageAutoregister] = useState(true); 
+  const [autoregisterEnabled, setAutoregisterEnabled] = useState(true); // Estado de si la función de autoregistro está activa
   const [autoregisterUrl, setAutoregisterUrl] = useState("");
 
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
@@ -262,68 +266,80 @@ export default function VisitorsPage() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isAutoregisterDialogOpen} onOpenChange={setIsAutoregisterDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <LinkIcon className="mr-2 h-4 w-4" />
-                Autoregistro
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle className="flex items-center"><QrCode className="mr-2 h-5 w-5 text-primary"/> Opciones de Autoregistro</DialogTitle>
-                <DialogDescription>
-                  Use el código QR o el enlace para que los visitantes se registren ellos mismos.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="flex items-center justify-center">
-                  {autoregisterUrl ? (
-                    <QRCode value={autoregisterUrl} size={192} level="H" />
-                  ) : (
-                    <div className="h-48 w-48 flex items-center justify-center bg-muted rounded-md">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          {currentUserCanManageAutoregister && (
+            <Dialog open={isAutoregisterDialogOpen} onOpenChange={setIsAutoregisterDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <LinkIcon className="mr-2 h-4 w-4" />
+                  Autoregistro
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center"><QrCode className="mr-2 h-5 w-5 text-primary"/> Opciones de Autoregistro</DialogTitle>
+                  <DialogDescription>
+                    Use el código QR o el enlace para que los visitantes se registren ellos mismos.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="flex items-center justify-center">
+                    {autoregisterUrl && autoregisterEnabled ? ( // Only show QR if URL exists and autoregister is enabled
+                      <QRCode value={autoregisterUrl} size={192} level="H" />
+                    ) : (
+                      <div className="h-48 w-48 flex flex-col items-center justify-center bg-muted rounded-md text-center p-4">
+                        { !autoregisterUrl ? <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" /> : null }
+                        <p className="text-sm text-muted-foreground">
+                          {autoregisterEnabled ? "Generando QR..." : "El autoregistro está desactivado."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  {autoregisterUrl && (
+                    <div className="space-y-1 text-center">
+                      <Label htmlFor="autoregister-link" className="text-sm font-medium">Enlace de Autoregistro:</Label>
+                      <Input
+                        id="autoregister-link"
+                        type="text"
+                        value={autoregisterEnabled ? autoregisterUrl : "Autoregistro desactivado"}
+                        readOnly
+                        className="text-center"
+                        disabled={!autoregisterEnabled}
+                      />
+                       <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-1" 
+                          onClick={() => navigator.clipboard.writeText(autoregisterUrl).then(() => toast({ title: "Enlace copiado" }))}
+                          disabled={!autoregisterEnabled || !autoregisterUrl}
+                        >
+                        Copiar Enlace
+                      </Button>
                     </div>
                   )}
-                </div>
-                {autoregisterUrl && (
-                  <div className="space-y-1 text-center">
-                    <Label htmlFor="autoregister-link" className="text-sm font-medium">Enlace de Autoregistro:</Label>
-                    <Input
-                      id="autoregister-link"
-                      type="text"
-                      value={autoregisterUrl}
-                      readOnly
-                      className="text-center"
+                  <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="autoregister-toggle" className="text-base">
+                        Activar Autoregistro
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Permite a los visitantes usar el enlace/QR.
+                      </p>
+                    </div>
+                    <Switch
+                      id="autoregister-toggle"
+                      checked={autoregisterEnabled}
+                      onCheckedChange={setAutoregisterEnabled}
                     />
-                     <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(autoregisterUrl).then(() => toast({ title: "Enlace copiado" }))}>
-                      Copiar Enlace
-                    </Button>
                   </div>
-                )}
-                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="autoregister-toggle" className="text-base">
-                      Activar Autoregistro
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Permite a los visitantes usar el enlace/QR.
-                    </p>
-                  </div>
-                  <Switch
-                    id="autoregister-toggle"
-                    checked={autoregisterEnabled}
-                    onCheckedChange={setAutoregisterEnabled}
-                  />
                 </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button">Cerrar</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button">Cerrar</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 

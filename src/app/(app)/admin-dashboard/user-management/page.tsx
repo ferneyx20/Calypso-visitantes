@@ -8,13 +8,14 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { UserCog, Users, Search, PlusCircle, Edit3, ShieldCheck, ShieldAlert, Loader2 } from "lucide-react";
+import { UserCog, Users, Search, PlusCircle, Edit3, ShieldCheck, ShieldAlert, Loader2, Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Simulación de un empleado existente que puede ser convertido a usuario
 interface SearchableEmployee {
@@ -29,6 +30,7 @@ interface SearchableEmployee {
 interface PlatformUser extends SearchableEmployee {
   userId: string;
   role: "Administrador" | "Estándar";
+  canManageAutoregister: boolean;
 }
 
 const MOCK_SEARCHABLE_EMPLOYEES: SearchableEmployee[] = [
@@ -93,6 +95,7 @@ export default function UserManagementPage() {
       ...selectedEmployee,
       userId: `user-${Date.now()}`,
       role: data.role,
+      canManageAutoregister: data.role === "Administrador", // Admins can manage by default
     };
     setPlatformUsers(prev => [...prev, newPlatformUser]);
     // Opcional: remover de searchResults si ya fue convertido
@@ -104,6 +107,19 @@ export default function UserManagementPage() {
     });
     setIsSubmittingRole(false);
     setIsRoleDialogOpen(false);
+  };
+
+  const handleToggleAutoregisterPermission = (userId: string, enabled: boolean) => {
+    setPlatformUsers(prevUsers =>
+      prevUsers.map(u =>
+        u.userId === userId ? { ...u, canManageAutoregister: enabled } : u
+      )
+    );
+    const userName = platformUsers.find(u => u.userId === userId)?.nombreApellido || "Usuario";
+    toast({
+      title: `Permiso de Autoregistro ${enabled ? "Concedido" : "Revocado"}`,
+      description: `${userName} ${enabled ? "ahora puede" : "ya no puede"} gestionar el autoregistro.`,
+    });
   };
 
 
@@ -177,7 +193,7 @@ export default function UserManagementPage() {
         <CardHeader>
           <CardTitle>Usuarios de la Plataforma</CardTitle>
           <CardDescription>
-            Lista de empleados que tienen acceso a la plataforma y sus roles.
+            Lista de empleados que tienen acceso a la plataforma, sus roles y permisos.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
@@ -189,6 +205,7 @@ export default function UserManagementPage() {
                     <TableHead>Nombre Completo</TableHead>
                     <TableHead>Identificación</TableHead>
                     <TableHead>Rol</TableHead>
+                    <TableHead>Permiso Autoregistro</TableHead>
                     {/* <TableHead className="text-right">Acciones</TableHead> */}
                   </TableRow>
                 </TableHeader>
@@ -202,6 +219,19 @@ export default function UserManagementPage() {
                           {user.role === "Administrador" ? <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> : <Users className="mr-1.5 h-3.5 w-3.5" />}
                           {user.role}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                           <Switch
+                            id={`autoregister-${user.userId}`}
+                            checked={user.canManageAutoregister}
+                            onCheckedChange={(checked) => handleToggleAutoregisterPermission(user.userId, checked)}
+                            aria-label={`Permiso de autoregistro para ${user.nombreApellido}`}
+                          />
+                          <Label htmlFor={`autoregister-${user.userId}`} className="text-xs">
+                            {user.canManageAutoregister ? "Permitido" : "Denegado"}
+                          </Label>
+                        </div>
                       </TableCell>
                       {/* <TableCell className="text-right">
                         <Button variant="ghost" size="icon"><Edit3 className="h-4 w-4" /></Button>
@@ -275,4 +305,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-
