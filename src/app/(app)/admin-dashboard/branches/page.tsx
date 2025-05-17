@@ -57,7 +57,7 @@ export default function BranchesPage() {
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h1 className="text-3xl font-semibold flex items-center">
           <Building2 className="mr-3 h-8 w-8 text-primary" />
           Gestión de Sedes
