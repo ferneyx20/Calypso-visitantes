@@ -11,7 +11,7 @@ export default function LoginPage() {
       >
         <div className="absolute inset-0 bg-black opacity-25" /> {/* Optional overlay */}
         <div className="z-10 text-center p-8">
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-4xl font-bold" style={{ color: 'hsl(var(--primary-foreground))' }}>
             GESTIÓN DE <span className="font-semibold">VISITANTES</span>
           </h1>
           <p className="mt-3 text-lg" style={{ color: 'hsl(var(--primary-foreground))' }}>
