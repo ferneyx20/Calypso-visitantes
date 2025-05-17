@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Building, Home, Users, Settings, UsersRound, Building2, ListChecks } from "lucide-react"; // Added ListChecks
+import { Building, Home, Users, Settings, UsersRound, Building2, ListChecks, History } from "lucide-react"; // Added History
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AppHeader from './app-header';
@@ -26,10 +26,11 @@ export default function AppShell({ children }: AppShellProps) {
   const menuItems = [
     { href: "/admin-dashboard", label: "Dashboard", icon: Home },
     { href: "/admin-dashboard/visitors", label: "Visitantes", icon: Users },
+    { href: "/admin-dashboard/consultas", label: "Consultas", icon: History }, // Nueva entrada
     { href: "/admin-dashboard/employees", label: "Gestión Empleados", icon: UsersRound },
     { href: "/admin-dashboard/branches", label: "Gestión Sedes", icon: Building2 },
     { href: "/admin-dashboard/user-management", label: "Gestión Usuarios", icon: Settings },
-    { href: "/admin-dashboard/list-management", label: "Gestión de Listas", icon: ListChecks }, // Nueva entrada
+    { href: "/admin-dashboard/list-management", label: "Gestión de Listas", icon: ListChecks },
   ];
 
   return (
