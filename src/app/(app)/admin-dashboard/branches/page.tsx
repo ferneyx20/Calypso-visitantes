@@ -4,7 +4,7 @@ import { Building2 } from "lucide-react";
 
 export default function BranchesPage() {
   return (
-    <div className="container mx-auto space-y-8">
+    <div className="w-full space-y-8">
       <div className="flex items-center justify-between">
          <h1 className="text-3xl font-semibold flex items-center">
           <Building2 className="mr-3 h-8 w-8 text-primary" />
