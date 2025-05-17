@@ -24,7 +24,7 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
 
   const menuItems = [
-    { href: "/", label: "Dashboard", icon: Home },
+    { href: "/admin-dashboard", label: "Dashboard", icon: Home }, // Updated href
     { href: "/visitors", label: "Visitantes", icon: Users },
     { href: "/settings", label: "Configuración", icon: Settings },
   ];

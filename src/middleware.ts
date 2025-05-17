@@ -1,9 +1,10 @@
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const MOCK_AUTH_COOKIE_NAME = 'mock_auth_token';
 const LOGIN_PATH = '/login';
-const APP_ROOT_PATH = '/';
+const APP_ROOT_PATH = '/admin-dashboard'; // Updated APP_ROOT_PATH
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -22,6 +23,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Temporarily commented out authentication logic
+  /*
   if (isAuthenticated) {
     // If authenticated and trying to access /login, redirect to app root
     if (pathname === LOGIN_PATH) {
@@ -32,12 +35,13 @@ export function middleware(request: NextRequest) {
     if (pathname !== LOGIN_PATH) {
       // Preserve search params if any, e.g., for redirecting after login
       const redirectUrl = new URL(LOGIN_PATH, request.url);
-      if (pathname !== APP_ROOT_PATH) { // Avoid adding callbackUrl if already at root
-         // redirectUrl.searchParams.set('callbackUrl', request.nextUrl.href);
-      }
+      // if (pathname !== APP_ROOT_PATH) { // Avoid adding callbackUrl if already at root
+      //    // redirectUrl.searchParams.set('callbackUrl', request.nextUrl.href);
+      // }
       return NextResponse.redirect(redirectUrl);
     }
   }
+  */
 
   return NextResponse.next();
 }

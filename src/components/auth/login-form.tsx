@@ -17,7 +17,7 @@ import { loginAction, type LoginActionResult } from '@/app/(auth)/login/actions'
 
 
 const loginSchema = z.object({
-  identification: z.string().min(1, { message: 'Por favor, ingrese su identificación.' }), // Changed min to 1 as "admin" is short
+  identification: z.string().min(1, { message: 'Por favor, ingrese su identificación.' }), 
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres.' }),
 });
 
@@ -52,7 +52,7 @@ export default function LoginForm() {
           title: 'Inicio de Sesión Exitoso',
           description: 'Redirigiendo al panel de control...',
         });
-        router.push('/');
+        router.push('/admin-dashboard'); // Updated redirect path
         router.refresh();
       } else {
         setErrorMessage(result.message);
@@ -125,14 +125,6 @@ export default function LoginForm() {
           'INICIAR SESIÓN'
         )}
       </Button>
-      {/* Removed "Forgot Password" Link */}
-      {/*
-      <div className="text-center">
-        <Link href="#" className="text-sm text-primary hover:underline">
-          ¿Olvidó su contraseña?
-        </Link>
-      </div>
-      */}
     </form>
   );
 }
