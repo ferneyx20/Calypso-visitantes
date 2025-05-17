@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Briefcase, Clock, Building, UserSquare, CalendarDays, BarChart3, ListOrdered } from "lucide-react";
+import { Users, Briefcase, Clock, Building, UserSquare, CalendarDays, BarChart3, ListOrdered, HandMetal } from "lucide-react";
 import SummaryCard from "./summary-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import VisitsByBranchChart, { type VisitData } from "./VisitsByBranchChart";
@@ -68,9 +68,18 @@ const generateMockVisits = (numVisits: number): Visit[] => {
 
 const ALL_MOCK_VISITS = generateMockVisits(150); // Generate 150 mock visits
 
+// Simulated user first name - in a real app, this would come from auth context
+const SIMULATED_USER_FIRST_NAME = "Admin"; // O "Usuario" para estándar
+
 export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummaryProps) {
   const [dateRange, setDateRange] = useState<string>("all_time");
   const [filteredVisits, setFilteredVisits] = useState<Visit[]>(ALL_MOCK_VISITS);
+  const [currentTime, setCurrentTime] = useState<string | null>(null);
+  
+  useEffect(() => {
+    setCurrentTime(new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }));
+  }, []);
+
 
   useEffect(() => {
     const now = new Date();
@@ -118,13 +127,15 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
     const todayEnd = new Date();
     todayEnd.setHours(23,59,59,999);
     return ALL_MOCK_VISITS.filter(v => v.timestamp >= todayStart && v.timestamp <= todayEnd).length;
-  }, [ALL_MOCK_VISITS]);
+  }, []); // Removed ALL_MOCK_VISITS dependency as it's constant after generation
 
   // This would come from an actual count of active visitors in a real app
   const currentVisitors = useMemo(() => Math.floor(todayVisitors / 3) + 2, [todayVisitors]); 
 
   const totalSedes = MOCK_SEDES.length;
-  const totalEmpleados = 78; // Simulated
+  const totalEmpleadosAdmin = 78; // Simulated for Admin
+  const totalEmpleadosStandard = 15; // Simulated for Standard (same branch)
+
 
   const visitsByBranchData: VisitData[] = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -134,7 +145,7 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
     return Object.entries(counts)
       .map(([name, visits]) => ({ name, visits }))
       .sort((a, b) => b.visits - a.visits)
-      .slice(0, 5); // Show top 5, chart will handle top 3 if needed or we can restrict here
+      .slice(0, 5); 
   }, [filteredVisits]);
 
   const recentVisitsData: RecentVisit[] = useMemo(() => {
@@ -147,6 +158,8 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
         visitTime: format(visit.timestamp, "Pp", { locale: es }),
       }));
   }, [filteredVisits]);
+
+  const greetingUserFirstName = userRole === 'Estándar' ? "Usuario" : "Admin";
 
 
   return (
@@ -169,6 +182,13 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
           </Select>
         </div>
       </div>
+
+      {currentTime && (
+        <div className="text-lg text-muted-foreground mb-6 flex items-center">
+           <HandMetal className="mr-2 h-5 w-5 text-primary" />
+          ¡Buenos días, {greetingUserFirstName}! Son las {currentTime}.
+        </div>
+      )}
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
@@ -184,21 +204,19 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
           description="Personas actualmente en las instalaciones"
         />
         {userRole === 'Admin' && (
-          <>
             <SummaryCard
               title="Total Sedes Activas"
               value={totalSedes.toString()}
               icon={<Building className="h-6 w-6 text-primary" />}
               description="Sedes operativas registradas"
             />
-            <SummaryCard
-              title="Total Empleados"
-              value={totalEmpleados.toString()}
-              icon={<Briefcase className="h-6 w-6 text-primary" />}
-              description="Empleados registrados en el sistema"
-            />
-          </>
         )}
+        <SummaryCard
+          title="Total Empleados"
+          value={userRole === 'Admin' ? totalEmpleadosAdmin.toString() : totalEmpleadosStandard.toString()}
+          icon={<Briefcase className="h-6 w-6 text-primary" />}
+          description={userRole === 'Admin' ? "Empleados registrados en el sistema" : "Empleados registrados en tu sede"}
+        />
       </div>
 
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
@@ -252,5 +270,3 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
     </section>
   );
 }
-
-    

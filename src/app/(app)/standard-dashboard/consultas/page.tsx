@@ -84,7 +84,7 @@ export default function StandardConsultasPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold flex items-center">
           <History className="mr-3 h-8 w-8 text-primary" />
-          Mis Consultas de Visitas
+          Consultas de Visitas
         </h1>
       </div>
 
@@ -150,7 +150,7 @@ export default function StandardConsultasPage() {
 
             <Button onClick={handleSearch} className="lg:self-end">
               <Search className="mr-2 h-4 w-4" />
-              Buscar Mis Visitas
+              Buscar Visitas
             </Button>
           </div>
         </CardContent>
@@ -176,7 +176,7 @@ export default function StandardConsultasPage() {
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
           { !hasSearched ? (
              <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
-                <p className="text-muted-foreground">Ingrese criterios y presione "Buscar Mis Visitas" para ver resultados.</p>
+                <p className="text-muted-foreground">Ingrese criterios y presione "Buscar Visitas" para ver resultados.</p>
             </div>
           ) : searchResults.length > 0 ? (
             <div className="mt-4 overflow-auto">
@@ -202,5 +202,3 @@ export default function StandardConsultasPage() {
     </div>
   );
 }
-
-    

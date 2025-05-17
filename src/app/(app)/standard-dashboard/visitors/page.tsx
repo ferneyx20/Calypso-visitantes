@@ -101,6 +101,7 @@ export default function StandardVisitorsPage() {
       empresaProviene: "",
       numerocarnet: "",
       vehiculoPlaca: "",
+      photoDataUri: "",
     },
   });
 
@@ -226,7 +227,7 @@ export default function StandardVisitorsPage() {
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
         <h1 className="text-3xl font-semibold flex items-center">
           <Users className="mr-3 h-8 w-8 text-primary" />
-          Gestión de Visitantes (Estándar)
+          Gestión de Visitantes
         </h1>
         <div className="flex gap-2">
           <Dialog open={isRegisterDialogOpen} onOpenChange={(open) => {
@@ -280,7 +281,8 @@ export default function StandardVisitorsPage() {
             </DialogContent>
           </Dialog>
 
-          {currentUserCanManageAutoregister && ( // This will be false for standard user
+          {/* Botón de Autoregistro oculto para el usuario estándar */}
+          {currentUserCanManageAutoregister && ( 
             <Dialog open={isAutoregisterDialogOpen} onOpenChange={setIsAutoregisterDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -420,5 +422,3 @@ export default function StandardVisitorsPage() {
     </div>
   );
 }
-
-    
