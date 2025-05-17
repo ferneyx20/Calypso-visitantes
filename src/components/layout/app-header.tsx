@@ -27,6 +27,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2 } from "lucide-react";
+import { logoutAction } from "@/app/(auth)/logout/actions";
 
 interface NotificationItem {
   id: string;
@@ -124,10 +125,20 @@ export default function AppHeader() {
   const handleClearNotifications = () => { setNotifications([]); };
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     toast({ title: "Cerrando Sesión", description: "Has cerrado sesión exitosamente." });
-    // In a real app, clear auth token here
-    router.push("/login");
+    try {
+      await logoutAction();
+      // The redirect is handled by the server action.
+      // router.refresh() can be called to ensure client state is fully updated if necessary,
+      // but the server-side redirect should typically handle this.
+      router.refresh(); 
+    } catch (error) {
+      // This catch block might not be reached for redirect errors,
+      // as Next.js handles those. But it's good for other potential action errors.
+      console.error("Logout failed:", error);
+      toast({ title: "Error al Cerrar Sesión", variant: "destructive" });
+    }
   };
 
   const handleChangePhoto = () => {
