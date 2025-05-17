@@ -2,17 +2,42 @@
 "use client";
 
 import { useState, type ChangeEvent } from 'react';
+import { useForm, type SubmitHandler } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UsersRound, Upload, FileText, Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const employeeSchema = z.object({
+  identificacion: z.string().min(5, { message: "La identificación debe tener al menos 5 caracteres." }),
+  nombreApellido: z.string().min(3, { message: "El nombre y apellido debe tener al menos 3 caracteres." }),
+  cargo: z.string().min(3, { message: "El cargo debe tener al menos 3 caracteres." }),
+  sede: z.string().min(3, { message: "La sede debe tener al menos 3 caracteres." }),
+});
+
+type EmployeeFormData = z.infer<typeof employeeSchema>;
 
 export default function EmployeesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAddEmployeeDialogOpen, setIsAddEmployeeDialogOpen] = useState(false);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   const { toast } = useToast();
+
+  const {
+    register: registerManual,
+    handleSubmit: handleSubmitManual,
+    reset: resetManual,
+    formState: { errors: errorsManual },
+  } = useForm<EmployeeFormData>({
+    resolver: zodResolver(employeeSchema),
+  });
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -26,7 +51,7 @@ export default function EmployeesPage() {
           variant: "destructive",
         });
         setSelectedFile(null);
-        event.target.value = ""; // Clear the input
+        event.target.value = "";
       }
     }
   };
@@ -40,21 +65,29 @@ export default function EmployeesPage() {
       });
       return;
     }
-
     setIsUploading(true);
-    // Simulate API call for upload
-    // In a real application, you would send the file to a server endpoint here
     await new Promise(resolve => setTimeout(resolve, 2000));
-
     setIsUploading(false);
     toast({
       title: "Carga Exitosa (Simulada)",
       description: `El archivo ${selectedFile.name} ha sido procesado.`,
     });
     setSelectedFile(null);
-    // Clear the file input if possible (might need a ref or reset the form)
     const fileInput = document.getElementById('csv-upload') as HTMLInputElement;
     if (fileInput) fileInput.value = "";
+  };
+
+  const onManualSubmit: SubmitHandler<EmployeeFormData> = async (data) => {
+    setIsSubmittingManual(true);
+    console.log("Nuevo Empleado (Manual):", data);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    toast({
+      title: "Empleado Agregado",
+      description: `El empleado "${data.nombreApellido}" ha sido agregado exitosamente.`,
+    });
+    setIsSubmittingManual(false);
+    setIsAddEmployeeDialogOpen(false);
+    resetManual();
   };
 
   return (
@@ -64,6 +97,89 @@ export default function EmployeesPage() {
           <UsersRound className="mr-3 h-8 w-8 text-primary" />
           Gestión de Empleados
         </h1>
+        <Dialog open={isAddEmployeeDialogOpen} onOpenChange={setIsAddEmployeeDialogOpen}>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar Empleado
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Agregar Nuevo Empleado Manualmente</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <UserPlus className="mr-2 h-5 w-5 text-primary" />
+                Agregar Nuevo Empleado
+              </DialogTitle>
+              <DialogDescription>
+                Complete los detalles del nuevo empleado a continuación.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitManual(onManualSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="identificacion">Identificación</Label>
+                <Input
+                  id="identificacion"
+                  placeholder="Ej: 123456789"
+                  {...registerManual("identificacion")}
+                />
+                {errorsManual.identificacion && <p className="text-sm text-destructive">{errorsManual.identificacion.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nombreApellido">Nombre y Apellido</Label>
+                <Input
+                  id="nombreApellido"
+                  placeholder="Ej: Carlos López"
+                  {...registerManual("nombreApellido")}
+                />
+                {errorsManual.nombreApellido && <p className="text-sm text-destructive">{errorsManual.nombreApellido.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cargo">Cargo</Label>
+                <Input
+                  id="cargo"
+                  placeholder="Ej: Desarrollador Frontend"
+                  {...registerManual("cargo")}
+                />
+                {errorsManual.cargo && <p className="text-sm text-destructive">{errorsManual.cargo.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sede">Sede</Label>
+                <Input
+                  id="sede"
+                  placeholder="Ej: Oficina Principal"
+                  {...registerManual("sede")}
+                />
+                {errorsManual.sede && <p className="text-sm text-destructive">{errorsManual.sede.message}</p>}
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isSubmittingManual}>
+                    Cancelar
+                  </Button>
+                </DialogClose>
+                <Button type="submit" disabled={isSubmittingManual}>
+                  {isSubmittingManual ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    "Guardar Empleado"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card className="shadow-lg">
