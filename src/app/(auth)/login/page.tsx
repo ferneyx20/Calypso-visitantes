@@ -22,9 +22,9 @@ export default function LoginPage() {
 
       {/* Right Panel (Login Form) */}
       <div className="flex w-full flex-col items-center justify-center bg-background p-8 lg:w-1/2">
-        <div className="mb-10 self-start">
-          {/* 
-            Asegúrate de colocar tu imagen 'pelican_logo.png' 
+        <div className="mb-10 flex justify-center"> {/* Changed self-start to flex justify-center */}
+          {/*
+            Asegúrate de colocar tu imagen 'pelican_logo.png'
             en la carpeta 'public/images/' de tu proyecto.
           */}
           <Image
@@ -33,6 +33,7 @@ export default function LoginPage() {
             width={120}
             height={120}
             priority // Cargar la imagen con prioridad ya que es importante para el LCP
+            data-ai-hint="pelican logo"
           />
         </div>
         <div className="w-full max-w-sm">
