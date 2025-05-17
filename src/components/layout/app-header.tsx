@@ -146,12 +146,12 @@ export default function AppHeader() {
 
   return (
     <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-      <div className="flex h-16 w-full items-center justify-between">
-        <div className="flex items-center gap-2 pl-4 md:pl-6">
+      <div className="flex h-16 w-full items-center justify-between px-4 md:px-6">
+        <div className="flex items-center gap-2">
           <SidebarTrigger className="md:hidden" />
           <h1 className="text-lg font-semibold text-foreground md:text-xl">Registro de Visitantes</h1>
         </div>
-        <div className="flex items-center gap-3 pr-4 md:pr-6">
+        <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -229,7 +229,7 @@ export default function AppHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="User Profile">
-                 <Avatar className="h-8 w-8">
+                 <Avatar className="h-9 w-9">
                   <AvatarImage src={currentUser.avatarUrl || undefined} alt={currentUser.name} data-ai-hint="user avatar" />
                   <AvatarFallback>{currentUser.initials}</AvatarFallback>
                 </Avatar>
