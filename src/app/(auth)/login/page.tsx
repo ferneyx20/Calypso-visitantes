@@ -10,16 +10,9 @@ export default function LoginPage() {
         style={{ backgroundColor: 'hsl(var(--calypso-red))' }}
       >
         <div className="absolute inset-0 bg-black opacity-20" /> {/* Optional overlay */}
-        <div className="z-10 mb-16">
-          <Image
-            src="https://placehold.co/300x100.png?text=CALYPSO"
-            alt="Calypso Logo"
-            width={300}
-            height={100}
-            data-ai-hint="brand logo"
-            className="mb-4"
-          />
-          <p className="mt-2 text-center text-2xl font-semibold">
+        <div className="z-10 mb-16 text-center">
+          {/* Image removed as per user request */}
+          <p className="mt-2 text-2xl font-semibold">
             ALIMENTOS PARA <span className="font-bold">TODOS</span>
           </p>
         </div>
