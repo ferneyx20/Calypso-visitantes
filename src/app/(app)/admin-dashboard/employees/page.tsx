@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState, type ChangeEvent, useEffect } from 'react';
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { useState, type ChangeEvent, useEffect, useMemo } from 'react';
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus } from "lucide-react";
+import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search } from "lucide-react"; // Added Search icon
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -21,19 +21,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"; // Import Form components
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 const employeeSchema = z.object({
   id: z.string().optional(),
   identificacion: z.string().min(5, { message: "La identificación debe tener al menos 5 caracteres." }),
   nombreApellido: z.string().min(3, { message: "El nombre y apellido debe tener al menos 3 caracteres." }),
   cargo: z.string().min(3, { message: "El cargo debe tener al menos 3 caracteres." }),
-  sede: z.string().min(1, { message: "Debe seleccionar una sede." }), // Sede es ahora requerida
+  sede: z.string().min(1, { message: "Debe seleccionar una sede." }),
 });
 
 type EmployeeFormData = z.infer<typeof employeeSchema>;
 
-// Simulación de sedes disponibles
 interface Sede {
   id: string;
   name: string;
@@ -46,7 +45,6 @@ const SIMULATED_SEDES: Sede[] = [
   { id: "sede-principal", name: "Sede Principal" },
 ];
 
-
 export default function EmployeesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -54,11 +52,10 @@ export default function EmployeesPage() {
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   const [employeesList, setEmployeesList] = useState<EmployeeFormData[]>([]);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  // Cargar sedes simuladas al montar
   useEffect(() => {
-    // En una app real, esto sería una llamada a API
     setAvailableSedes(SIMULATED_SEDES);
   }, []);
 
@@ -99,9 +96,7 @@ export default function EmployeesPage() {
       return;
     }
     setIsUploading(true);
-    // Simulación de procesamiento de CSV
     await new Promise(resolve => setTimeout(resolve, 2000));
-    // Aquí se procesaría el CSV y se añadirían empleados a employeesList
     setIsUploading(false);
     toast({
       title: "Carga Exitosa (Simulada)",
@@ -127,6 +122,19 @@ export default function EmployeesPage() {
     setIsAddEmployeeDialogOpen(false);
     manualForm.reset();
   };
+
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value.toLowerCase());
+  };
+
+  const filteredEmployees = useMemo(() => {
+    if (!searchTerm) return employeesList;
+    return employeesList.filter(
+      emp =>
+        emp.nombreApellido.toLowerCase().includes(searchTerm) ||
+        emp.identificacion.includes(searchTerm)
+    );
+  }, [employeesList, searchTerm]);
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
@@ -249,6 +257,59 @@ export default function EmployeesPage() {
         </Dialog>
       </div>
 
+      <Card className="shadow-lg flex flex-col flex-1">
+        <CardHeader>
+          <CardTitle>Lista de Empleados</CardTitle>
+          <CardDescription>
+            Aquí se mostrará la tabla con los empleados registrados. Puede buscar por nombre o identificación.
+          </CardDescription>
+          <div className="flex items-center gap-2 pt-4">
+            <Search className="h-5 w-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Buscar por nombre o identificación..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="max-w-sm"
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 pt-0 flex flex-col flex-1">
+           {employeesList.length === 0 ? (
+            <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+              <p className="text-muted-foreground">No hay empleados registrados aún.</p>
+            </div>
+           ) : filteredEmployees.length === 0 ? (
+            <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
+              <p className="text-muted-foreground">No se encontraron empleados que coincidan con su búsqueda.</p>
+            </div>
+           ) : (
+            <div className="mt-4 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Identificación</TableHead>
+                    <TableHead>Nombre y Apellido</TableHead>
+                    <TableHead>Cargo</TableHead>
+                    <TableHead>Sede</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEmployees.map((employee) => (
+                    <TableRow key={employee.id}>
+                      <TableCell>{employee.identificacion}</TableCell>
+                      <TableCell className="font-medium">{employee.nombreApellido}</TableCell>
+                      <TableCell>{employee.cargo}</TableCell>
+                      <TableCell>{employee.sede}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Cargar Empleados desde CSV</CardTitle>
@@ -303,44 +364,6 @@ export default function EmployeesPage() {
         </CardFooter>
       </Card>
 
-      <Card className="shadow-lg flex flex-col flex-1">
-        <CardHeader>
-          <CardTitle>Lista de Empleados</CardTitle>
-          <CardDescription>
-            Aquí se mostrará la tabla con los empleados registrados.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-6 pt-0 flex flex-col flex-1">
-           {employeesList.length > 0 ? (
-            <div className="mt-4 overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Identificación</TableHead>
-                    <TableHead>Nombre y Apellido</TableHead>
-                    <TableHead>Cargo</TableHead>
-                    <TableHead>Sede</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {employeesList.map((employee) => (
-                    <TableRow key={employee.id}>
-                      <TableCell>{employee.identificacion}</TableCell>
-                      <TableCell className="font-medium">{employee.nombreApellido}</TableCell>
-                      <TableCell>{employee.cargo}</TableCell>
-                      <TableCell>{employee.sede}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
-              <p className="text-muted-foreground">No hay empleados registrados aún.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
