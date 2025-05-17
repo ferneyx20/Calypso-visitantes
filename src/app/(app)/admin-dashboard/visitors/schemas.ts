@@ -5,16 +5,37 @@ import { z } from "zod";
 export const TIPO_DOCUMENTO = ["CC", "CE", "TI", "Pasaporte", "Otro"] as const;
 export const GENERO = ["Masculino", "Femenino", "No binario", "Prefiero no decir", "Otro"] as const;
 export const RH = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"] as const;
-export const TIPO_VISITA = ["Programada", "No Programada", "Contratista", "Mensajería", "Entrevista", "Proveedor", "Cliente", "Otro"] as const;
+export const TIPO_VISITA_OPTIONS = ["Programada", "No Programada", "Contratista", "Mensajería", "Entrevista", "Proveedor", "Cliente", "Otro"] as const;
+
+export const ARL_OPTIONS = [
+  "Sura",
+  "Positiva",
+  "Colmena Seguros",
+  "Seguros Bolívar",
+  "Liberty Seguros",
+  "Mapfre",
+  "Equidad Seguros",
+  "Alfa",
+  "Otro",
+] as const;
+
+export const EPS_OPTIONS = [
+  "Sura EPS",
+  "Sanitas EPS",
+  "Compensar EPS",
+  "Salud Total EPS",
+  "Nueva EPS",
+  "Coomeva EPS",
+  "Famisanar EPS",
+  "Aliansalud EPS",
+  "Mutual SER",
+  "SOS EPS",
+  "Otro",
+] as const;
+
 
 export const visitorRegistrationSchema = z.object({
-  // Visit Details
-  personavisitada: z.string().min(3, { message: "El nombre de la persona visitada es requerido." }),
-  purpose: z.string().min(5, { message: "El propósito de la visita es requerido." }),
-  category: z.string().optional(), // AI Suggested
-  tipovisita: z.enum(TIPO_VISITA, { required_error: "El tipo de visita es requerido." }),
-
-  // Visitor Personal Information
+  // Visitor Personal Information (Ahora primero)
   tipodocumento: z.enum(TIPO_DOCUMENTO, { required_error: "El tipo de documento es requerido." }),
   numerodocumento: z.string().min(5, { message: "El número de documento es requerido." }),
   nombres: z.string().min(2, { message: "El nombre es requerido." }),
@@ -23,6 +44,13 @@ export const visitorRegistrationSchema = z.object({
   fechanacimiento: z.date({ required_error: "La fecha de nacimiento es requerida." }),
   rh: z.enum(RH, { required_error: "El RH es requerido." }),
   telefono: z.string().regex(/^\+?[0-9\s-()]{7,20}$/, { message: "Número de teléfono inválido." }),
+
+  // Visit Details
+  personavisitada: z.string().min(3, { message: "El nombre de la persona visitada es requerido." }),
+  purpose: z.string().min(5, { message: "El propósito de la visita es requerido." }),
+  category: z.string().optional(), // AI Suggested
+  tipovisita: z.string().min(1, {message: "El tipo de visita es requerido."}),
+
 
   // Additional Visitor Information (Optional)
   empresaProviene: z.string().optional(),
@@ -47,4 +75,9 @@ export interface VisitorEntry extends VisitorFormData {
   horaentrada: Date;
   horasalida: Date | null;
   estado: "activa" | "finalizada";
+}
+
+// Helper para convertir arrays de readonly a string[] para los combobox
+export function toWritableArray<T extends string>(arr: readonly T[]): string[] {
+  return [...arr];
 }

@@ -13,7 +13,10 @@ import {
   TIPO_DOCUMENTO,
   GENERO,
   RH,
-  TIPO_VISITA,
+  TIPO_VISITA_OPTIONS,
+  ARL_OPTIONS,
+  EPS_OPTIONS,
+  toWritableArray,
 } from "./schemas";
 
 import { Button } from "@/components/ui/button";
@@ -24,12 +27,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Loader2, Lightbulb, CalendarIcon, LogOut, Users } from "lucide-react"; // Added Users
+import { Plus, Search, Loader2, Lightbulb, CalendarIcon, LogOut, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -55,16 +59,21 @@ export default function VisitorsPage() {
   const [visitorEntries, setVisitorEntries] = useState<VisitorEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const [tipoVisitaOptions, setTipoVisitaOptions] = useState<string[]>(toWritableArray(TIPO_VISITA_OPTIONS));
+  const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
+  const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
+
   const form = useForm<VisitorFormData>({
     resolver: zodResolver(visitorRegistrationSchema),
     defaultValues: {
       purpose: "",
       category: "",
-      // Initialize other fields as needed, especially enums
       tipodocumento: undefined,
       genero: undefined,
       rh: undefined,
       tipovisita: undefined,
+      arl: undefined,
+      eps: undefined,
       empresaProviene: "",
       numerocarnet: "",
       vehiculoPlaca: "",
@@ -114,7 +123,6 @@ export default function VisitorsPage() {
 
   const onSubmit: SubmitHandler<VisitorFormData> = async (data) => {
     setIsSubmitting(true);
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     const newEntry: VisitorEntry = {
@@ -166,6 +174,16 @@ export default function VisitorsPage() {
     );
   }, [activeVisitors, searchTerm]);
 
+  const handleAddOptionToList = (
+    optionValue: string,
+    optionsList: string[],
+    setOptionsList: React.Dispatch<React.SetStateAction<string[]>>
+  ) => {
+    if (optionValue && !optionsList.some(opt => opt.toLowerCase() === optionValue.toLowerCase())) {
+      setOptionsList(prev => [...prev, optionValue]);
+    }
+  };
+
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
       <div className="flex items-center justify-between">
@@ -189,67 +207,7 @@ export default function VisitorsPage() {
               <form onSubmit={form.handleSubmit(onSubmit)}>
                 <ScrollArea className="h-[60vh] p-1 pr-4">
                   <div className="space-y-6 p-2">
-                    <Card>
-                      <CardHeader><CardTitle className="text-lg">Detalles de la Visita</CardTitle></CardHeader>
-                      <CardContent className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="personavisitada"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Persona a Visitar</FormLabel>
-                              <FormControl><Input placeholder="Ej: Juan Pérez, Departamento de Ventas" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="purpose"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Propósito de la Visita</FormLabel>
-                              <FormControl><Textarea placeholder="Ej: Reunión de seguimiento, Entrega de documentos" {...field} rows={3} /></FormControl>
-                              {isCategorizing && <FormDescription className="flex items-center"><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Sugiriendo categoría...</FormDescription>}
-                              {suggestedCategory && !isCategorizing && (
-                                <FormDescription className="flex items-center gap-1 pt-1">
-                                  <Lightbulb className="h-3 w-3 text-yellow-500" />
-                                  <span>Sugerencia:</span>
-                                  <Badge variant="secondary" className="cursor-default">{suggestedCategory}</Badge>
-                                </FormDescription>
-                              )}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                         <FormField
-                          control={form.control}
-                          name="category"
-                          render={({ field }) => (
-                            <FormItem className="hidden">
-                              <FormControl><Input {...field} /></FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="tipovisita"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Tipo de Visita</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Seleccione un tipo" /></SelectTrigger></FormControl>
-                                <SelectContent>
-                                  {TIPO_VISITA.map(tipo => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
-
+                    {/* Información Personal del Visitante - Ahora primero */}
                     <Card>
                       <CardHeader><CardTitle className="text-lg">Información Personal del Visitante</CardTitle></CardHeader>
                       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -259,7 +217,7 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Tipo de Documento</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={field.disabled}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione tipo" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   {TIPO_DOCUMENTO.map(tipo => <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>)}
@@ -308,7 +266,7 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Género</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={field.disabled}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione género" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   {GENERO.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
@@ -333,6 +291,7 @@ export default function VisitorsPage() {
                                         "w-full pl-3 text-left font-normal",
                                         !field.value && "text-muted-foreground"
                                       )}
+                                      disabled={field.disabled}
                                     >
                                       {field.value ? (
                                         format(field.value, "PPP", { locale: es })
@@ -366,7 +325,7 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>RH</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={field.disabled}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="Seleccione RH" /></SelectTrigger></FormControl>
                                 <SelectContent>
                                   {RH.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
@@ -383,6 +342,73 @@ export default function VisitorsPage() {
                             <FormItem>
                               <FormLabel>Teléfono</FormLabel>
                               <FormControl><Input type="tel" placeholder="Ej: 3001234567" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                    </Card>
+
+                    {/* Detalles de la Visita - Ahora segundo */}
+                    <Card>
+                      <CardHeader><CardTitle className="text-lg">Detalles de la Visita</CardTitle></CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="personavisitada"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Persona a Visitar</FormLabel>
+                              <FormControl><Input placeholder="Ej: Juan Pérez, Departamento de Ventas" {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="purpose"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Propósito de la Visita</FormLabel>
+                              <FormControl><Textarea placeholder="Ej: Reunión de seguimiento, Entrega de documentos" {...field} rows={3} /></FormControl>
+                              {isCategorizing && <FormDescription className="flex items-center"><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Sugiriendo categoría...</FormDescription>}
+                              {suggestedCategory && !isCategorizing && (
+                                <FormDescription className="flex items-center gap-1 pt-1">
+                                  <Lightbulb className="h-3 w-3 text-yellow-500" />
+                                  <span>Sugerencia:</span>
+                                  <Badge variant="secondary" className="cursor-default">{suggestedCategory}</Badge>
+                                </FormDescription>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                         <FormField
+                          control={form.control}
+                          name="category"
+                          render={({ field }) => (
+                            <FormItem className="hidden">
+                              <FormControl><Input {...field} /></FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="tipovisita"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tipo de Visita</FormLabel>
+                              <Combobox
+                                options={tipoVisitaOptions}
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onAddOption={(newOption) => handleAddOptionToList(newOption, tipoVisitaOptions, setTipoVisitaOptions)}
+                                placeholder="Seleccione o escriba tipo"
+                                searchPlaceholder="Buscar o agregar tipo..."
+                                emptyMessage="Tipo no encontrado. Puede agregarlo."
+                                addButtonLabel="Agregar tipo"
+                                disabled={field.disabled}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -438,7 +464,17 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>ARL</FormLabel>
-                              <FormControl><Input placeholder="Ej: Sura" {...field} /></FormControl>
+                               <Combobox
+                                options={arlOptions}
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onAddOption={(newOption) => handleAddOptionToList(newOption, arlOptions, setArlOptions)}
+                                placeholder="Seleccione o escriba ARL"
+                                searchPlaceholder="Buscar o agregar ARL..."
+                                emptyMessage="ARL no encontrada. Puede agregarla."
+                                addButtonLabel="Agregar ARL"
+                                disabled={field.disabled}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
@@ -449,7 +485,17 @@ export default function VisitorsPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>EPS</FormLabel>
-                              <FormControl><Input placeholder="Ej: Coomeva" {...field} /></FormControl>
+                              <Combobox
+                                options={epsOptions}
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                onAddOption={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
+                                placeholder="Seleccione o escriba EPS"
+                                searchPlaceholder="Buscar o agregar EPS..."
+                                emptyMessage="EPS no encontrada. Puede agregarla."
+                                addButtonLabel="Agregar EPS"
+                                disabled={field.disabled}
+                              />
                               <FormMessage />
                             </FormItem>
                           )}
