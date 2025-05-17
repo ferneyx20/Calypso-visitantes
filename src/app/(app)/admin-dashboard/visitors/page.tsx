@@ -343,7 +343,7 @@ export default function VisitorsPage() {
         </div>
       </div>
 
-      <Card className="shadow-lg flex flex-col flex-1">
+      <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Visitantes Activos</CardTitle>
           <CardDescription>

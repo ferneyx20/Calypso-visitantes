@@ -133,7 +133,7 @@ export default function UserManagementPage() {
         {/* Podría haber un botón para crear usuarios administradores directamente si es necesario */}
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Buscar Empleados para Convertir en Usuarios</CardTitle>
           <CardDescription>
@@ -189,7 +189,7 @@ export default function UserManagementPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-lg flex flex-col flex-1">
+      <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Usuarios de la Plataforma</CardTitle>
           <CardDescription>

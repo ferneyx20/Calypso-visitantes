@@ -146,7 +146,7 @@ export default function DashboardSummary() {
 
 
   return (
-    <section aria-labelledby="dashboard-summary-title" className="space-y-8">
+    <section aria-labelledby="dashboard-summary-title" className="space-y-8 w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 id="dashboard-summary-title" className="text-2xl font-semibold text-foreground">Resumen del Panel</h2>
         <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export default function DashboardSummary() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-        <Card className="lg:col-span-2 shadow-lg">
+        <Card className="lg:col-span-2 shadow-lg w-full">
           <CardHeader>
             <CardTitle className="flex items-center text-xl">
                 <BarChart3 className="mr-2 h-6 w-6 text-primary"/>
@@ -221,7 +221,7 @@ export default function DashboardSummary() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-1 shadow-lg">
+        <Card className="lg:col-span-1 shadow-lg w-full">
           <CardHeader>
             <CardTitle className="flex items-center text-xl">
                 <ListOrdered className="mr-2 h-6 w-6 text-primary"/>

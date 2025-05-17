@@ -89,7 +89,7 @@ export default function ConsultasPage() {
         </h1>
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Filtros de Búsqueda</CardTitle>
           <CardDescription>
@@ -157,7 +157,7 @@ export default function ConsultasPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-lg flex flex-col flex-1">
+      <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>

@@ -126,7 +126,7 @@ export default function BranchesPage() {
         </Dialog>
       </div>
 
-      <Card className="shadow-lg flex flex-col flex-1">
+      <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Listado de Sedes</CardTitle>
           <CardDescription>

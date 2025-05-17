@@ -167,7 +167,7 @@ export default function ListManagementPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {allManagedLists.map((list) => (
-          <Card key={list.title} className="shadow-lg flex flex-col">
+          <Card key={list.title} className="shadow-lg flex flex-col w-full">
             <CardHeader>
               <CardTitle>{list.title}</CardTitle>
               <CardDescription>Opciones para el campo "{list.title}".</CardDescription>

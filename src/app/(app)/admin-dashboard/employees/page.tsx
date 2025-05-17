@@ -257,7 +257,7 @@ export default function EmployeesPage() {
         </Dialog>
       </div>
 
-      <Card className="shadow-lg flex flex-col flex-1">
+      <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Lista de Empleados</CardTitle>
           <CardDescription>
@@ -310,7 +310,7 @@ export default function EmployeesPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-lg">
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Cargar Empleados desde CSV</CardTitle>
           <CardDescription>
