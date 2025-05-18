@@ -3,79 +3,61 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Briefcase, Clock, Building, UserSquare, CalendarDays, BarChart3, ListOrdered, HandMetal, Sun, Moon } from "lucide-react"; // Added Sun, Moon
+import { Users, Briefcase, Clock, Building, UserSquare, CalendarDays, BarChart3, ListOrdered, HandMetal, Sun, Moon, Loader2 } from "lucide-react";
 import SummaryCard from "./summary-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import VisitsByBranchChart, { type VisitData } from "./VisitsByBranchChart";
 import RecentVisitsList, { type RecentVisit } from "./RecentVisitsList";
 import { es } from "date-fns/locale";
-import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
+import { subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, parseISO } from "date-fns";
+import type { RolUsuarioPlataforma } from "@prisma/client";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock Data
-interface Sede {
+interface SedeFromAPI {
   id: string;
   name: string;
+  address: string;
+  createdAt: string;
+  updatedAt: string;
 }
-
-interface Visit {
+interface EmployeeFromAPI {
   id: string;
-  visitorName: string;
+  identificacion: string;
+  nombreApellido: string;
+  cargo: string;
   sedeId: string;
-  sedeName: string;
-  timestamp: Date;
-  purpose: string;
+  sede?: { name: string };
+  createdAt: string;
+  updatedAt: string;
+}
+interface VisitFromAPI {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  horaentrada: string; // ISO string
+  sede?: { name: string }; // Asumiendo que la API puede devolver esto si personavisitadaId se usa para inferir sede
+  personavisitada?: { nombreApellido: string, sede?: { name: string } };
+  // Para visitas por sede, necesitaríamos la sede de la visita.
+  // Si personavisitada.sede no está disponible, podríamos necesitar un campo sede_id en la visita
 }
 
 interface DashboardSummaryProps {
-  userRole?: 'Admin' | 'Estándar';
+  userRole?: RolUsuarioPlataforma | 'Admin' | 'Estándar'; // 'Admin' es fallback
 }
 
-const MOCK_SEDES: Sede[] = [
-  { id: "sede-norte", name: "Sede Norte" },
-  { id: "sede-centro", name: "Sede Centro" },
-  { id: "sede-sur", name: "Sede Sur" },
-  { id: "sede-principal", name: "Sede Principal" },
-  { id: "sede-oeste", name: "Sede Oeste" },
-];
-
-// Helper to generate more diverse mock visits
-const generateMockVisits = (numVisits: number): Visit[] => {
-  const visits: Visit[] = [];
-  const purposes = ["Reunión de Ventas", "Soporte Técnico", "Entrega de Paquete", "Entrevista", "Visita Proveedor", "Consulta Cliente"];
-  const visitorNames = ["Ana García", "Luis Pérez", "Sofía Rodríguez", "Carlos Martínez", "Laura Gómez", "David Fernández", "Elena Castillo", "Javier Torres"];
-  
-  for (let i = 0; i < numVisits; i++) {
-    const randomSede = MOCK_SEDES[Math.floor(Math.random() * MOCK_SEDES.length)];
-    const randomPurpose = purposes[Math.floor(Math.random() * purposes.length)];
-    const randomName = visitorNames[Math.floor(Math.random() * visitorNames.length)];
-    // Generate timestamps within the last 60 days
-    const randomDaysAgo = Math.floor(Math.random() * 60);
-    const visitTimestamp = subDays(new Date(), randomDaysAgo);
-    visitTimestamp.setHours(Math.floor(Math.random() * 9) + 8, Math.floor(Math.random() * 60)); // Between 8 AM and 5 PM
-
-    visits.push({
-      id: `visit-${i + 1}-${Date.now()}`,
-      visitorName: randomName,
-      sedeId: randomSede.id,
-      sedeName: randomSede.name,
-      timestamp: visitTimestamp,
-      purpose: randomPurpose,
-    });
-  }
-  return visits.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Sort by most recent
-};
-
-
-const ALL_MOCK_VISITS = generateMockVisits(150); // Generate 150 mock visits
-
-
 export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummaryProps) {
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState<string>("all_time");
-  const [filteredVisits, setFilteredVisits] = useState<Visit[]>(ALL_MOCK_VISITS);
+  
+  const [allVisits, setAllVisits] = useState<VisitFromAPI[]>([]);
+  const [allSedes, setAllSedes] = useState<SedeFromAPI[]>([]);
+  const [allEmployees, setAllEmployees] = useState<EmployeeFromAPI[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [greeting, setGreeting] = useState<string | null>(null);
   const [greetingIcon, setGreetingIcon] = useState<React.ReactNode | null>(null);
   
-  const greetingUserFirstName = userRole === 'Estándar' ? "Usuario" : "Admin";
+  const greetingUserFirstName = userRole === 'Estandar' ? "Usuario" : "Admin";
 
   useEffect(() => {
     const currentHour = new Date().getHours();
@@ -93,8 +75,40 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
     setGreetingIcon(icon);
   }, []);
 
-
   useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [visitsRes, sedesRes, employeesRes] = await Promise.all([
+          fetch('/api/visitantes'), // Podríamos añadir ?estado=activa o filtros de fecha aquí si el backend los soporta
+          fetch('/api/sedes'),
+          fetch('/api/empleados')
+        ]);
+
+        if (!visitsRes.ok) throw new Error('Error al cargar visitas');
+        if (!sedesRes.ok) throw new Error('Error al cargar sedes');
+        if (!employeesRes.ok) throw new Error('Error al cargar empleados');
+
+        const visitsData = await visitsRes.json();
+        const sedesData = await sedesRes.json();
+        const employeesData = await employeesRes.json();
+
+        setAllVisits(visitsData);
+        setAllSedes(sedesData);
+        setAllEmployees(employeesData);
+
+      } catch (error) {
+        toast({ variant: "destructive", title: "Error de Carga", description: (error as Error).message });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [toast]);
+
+
+  const filteredVisits = useMemo(() => {
+    if (isLoading) return [];
     const now = new Date();
     let startDate: Date | null = null;
     let endDate: Date | null = null;
@@ -102,7 +116,8 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
     switch (dateRange) {
       case "today":
         startDate = new Date(now.setHours(0, 0, 0, 0));
-        endDate = new Date(now.setHours(23, 59, 59, 999));
+        endDate = new Date(now.setHours(23, 59, 59, 999)); // Reset hours for today end
+        now.setHours(0,0,0,0); // reset now for next calculations
         break;
       case "yesterday":
         const yesterday = subDays(now, 1);
@@ -121,56 +136,77 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
         break;
       case "all_time":
       default:
-        setFilteredVisits(ALL_MOCK_VISITS);
-        return;
+        return allVisits;
     }
-
-    const newFilteredVisits = ALL_MOCK_VISITS.filter(visit => {
-      const visitDate = new Date(visit.timestamp);
+    
+    return allVisits.filter(visit => {
+      const visitDate = parseISO(visit.horaentrada); // API devuelve string ISO
       return visitDate >= startDate! && visitDate <= endDate!;
     });
-    setFilteredVisits(newFilteredVisits);
-
-  }, [dateRange]);
+  }, [dateRange, allVisits, isLoading]);
 
 
-  const todayVisitors = useMemo(() => {
+  const todayVisitorsCount = useMemo(() => {
+    if (isLoading) return 0;
     const todayStart = new Date();
     todayStart.setHours(0,0,0,0);
     const todayEnd = new Date();
     todayEnd.setHours(23,59,59,999);
-    return ALL_MOCK_VISITS.filter(v => v.timestamp >= todayStart && v.timestamp <= todayEnd).length;
-  }, []); 
+    return allVisits.filter(v => {
+        const visitDate = parseISO(v.horaentrada);
+        return visitDate >= todayStart && visitDate <= todayEnd;
+    }).length;
+  }, [allVisits, isLoading]); 
 
-  const currentVisitors = useMemo(() => Math.floor(todayVisitors / 3) + 2, [todayVisitors]); 
+  // Simulación, ya que no tenemos estado 'activo' vs 'total' desde el backend directamente aquí
+  const currentVisitorsCount = useMemo(() => {
+    if (isLoading) return 0;
+    // En una app real, esto vendría de /api/visitantes?estado=activa
+    return Math.floor(todayVisitorsCount / 3) + (allVisits.length > 0 ? 1 : 0) ; 
+  }, [todayVisitorsCount, allVisits, isLoading]); 
 
-  const totalSedes = MOCK_SEDES.length;
-  const totalEmpleadosAdmin = 78; 
-  const totalEmpleadosStandard = 15; 
+  const totalSedesCount = useMemo(() => isLoading ? 0 : allSedes.length, [allSedes, isLoading]);
+  const totalEmployeesCount = useMemo(() => isLoading ? 0 : allEmployees.length, [allEmployees, isLoading]);
+  // Para usuario estándar, podríamos filtrar empleados por sede si tuviéramos la sede del usuario
+  const totalEmployeesStandardCount = 15; // Simulación
 
 
   const visitsByBranchData: VisitData[] = useMemo(() => {
+    if (isLoading) return [];
     const counts: Record<string, number> = {};
     filteredVisits.forEach(visit => {
-      counts[visit.sedeName] = (counts[visit.sedeName] || 0) + 1;
+      // Tratar de obtener la sede de la visita. 
+      // Asumimos que personavisitada.sede.name está disponible o una lógica similar.
+      // Esto es una simplificación; en una app real, la estructura de datos de la visita podría tener un `sedeId` directo.
+      const sedeName = visit.personavisitada?.sede?.name || visit.sede?.name || "Sede Desconocida";
+      counts[sedeName] = (counts[sedeName] || 0) + 1;
     });
     return Object.entries(counts)
       .map(([name, visits]) => ({ name, visits }))
       .sort((a, b) => b.visits - a.visits)
       .slice(0, 5); 
-  }, [filteredVisits]);
+  }, [filteredVisits, isLoading]);
 
   const recentVisitsData: RecentVisit[] = useMemo(() => {
-    return filteredVisits
+    if (isLoading) return [];
+    return filteredVisits // Ya están ordenadas por horaentrada desc en la API (asumido)
       .slice(0, 5)
       .map(visit => ({
         id: visit.id,
-        visitorName: visit.visitorName,
-        branchName: visit.sedeName,
-        visitTime: format(visit.timestamp, "Pp", { locale: es }),
+        visitorName: `${visit.nombres} ${visit.apellidos}`,
+        branchName: visit.personavisitada?.sede?.name || visit.sede?.name || "Sede Desconocida",
+        visitTime: format(parseISO(visit.horaentrada), "Pp", { locale: es }),
       }));
-  }, [filteredVisits]);
+  }, [filteredVisits, isLoading]);
 
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <section aria-labelledby="dashboard-summary-title" className="space-y-8 w-full">
@@ -194,7 +230,7 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
       </div>
 
       {greeting && greetingIcon && (
-        <div className="text-xl text-muted-foreground mb-6 flex items-center justify-center text-center py-2"> {/* Increased font size and added padding */}
+        <div className="text-xl text-muted-foreground mb-6 flex items-center justify-center text-center py-2">
            {greetingIcon}
            {greeting},
            <span className="font-semibold text-primary mx-1">{greetingUserFirstName}</span>
@@ -205,29 +241,29 @@ export default function DashboardSummary({ userRole = 'Admin' }: DashboardSummar
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           title="Visitantes Hoy"
-          value={todayVisitors.toString()}
+          value={todayVisitorsCount.toString()}
           icon={<Users className="h-6 w-6 text-primary" />}
           description="Total de registros el día de hoy"
         />
         <SummaryCard
           title="Visitantes Actuales"
-          value={currentVisitors.toString()}
+          value={currentVisitorsCount.toString()}
           icon={<UserSquare className="h-6 w-6 text-primary" />}
           description="Personas actualmente en las instalaciones"
         />
-        {userRole === 'Admin' && (
+        {userRole !== 'Estandar' && (
             <SummaryCard
               title="Total Sedes Activas"
-              value={totalSedes.toString()}
+              value={totalSedesCount.toString()}
               icon={<Building className="h-6 w-6 text-primary" />}
               description="Sedes operativas registradas"
             />
         )}
         <SummaryCard
           title="Total Empleados"
-          value={userRole === 'Admin' ? totalEmpleadosAdmin.toString() : totalEmpleadosStandard.toString()}
+          value={userRole !== 'Estandar' ? totalEmployeesCount.toString() : totalEmployeesStandardCount.toString()}
           icon={<Briefcase className="h-6 w-6 text-primary" />}
-          description={userRole === 'Admin' ? "Empleados registrados en el sistema" : "Empleados registrados en tu sede"}
+          description={userRole !== 'Estandar' ? "Empleados registrados en el sistema" : "Empleados registrados en tu sede"}
         />
       </div>
 

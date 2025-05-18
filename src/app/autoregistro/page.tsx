@@ -23,13 +23,12 @@ import { Loader2, ScanFace, Building } from "lucide-react";
 import VisitorRegistrationFormFields from "@/components/visitor/visitor-registration-form-fields"; 
 import Image from "next/image";
 
-// Simulación de empleados
-const SIMULATED_EMPLOYEES = [
-  { id: "emp-001", name: "Juan Pérez (Ventas)", identification: "12345678" },
-  { id: "emp-002", name: "Ana Gómez (Recepción)", identification: "87654321" },
-  { id: "emp-003", name: "Carlos López (TI)", identification: "11223344" },
-  { id: "emp-004", name: "Sofía Ramírez (RRHH)", identification: "44332211" },
-];
+// Interfaz para datos de empleado para el combobox
+interface EmployeeOption {
+  value: string; // employee ID
+  label: string; // "Nombre Apellido (ID: Identificacion)"
+}
+
 
 const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -49,24 +48,19 @@ export default function AutoregistroPage() {
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
 
+  // Estados para opciones de comboboxes
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
   const [generoOptions, setGeneroOptions] = useState<string[]>(toWritableArray(GENERO));
   const [rhOptions, setRhOptions] = useState<string[]>(toWritableArray(RH));
   const [tipoVisitaOptions, setTipoVisitaOptions] = useState<string[]>(toWritableArray(TIPO_VISITA_OPTIONS));
   const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
   const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
-  
-  const employeeComboboxOptions = useMemo(() => 
-    SIMULATED_EMPLOYEES.map(emp => ({
-      value: emp.id,
-      label: `${emp.name} (ID: ${emp.identification})`,
-    })), 
-  []);
+  const [employeeComboboxOptions, setEmployeeComboboxOptions] = useState<EmployeeOption[]>([]);
 
   const form = useForm<VisitorFormData>({
     resolver: zodResolver(visitorRegistrationSchema),
     defaultValues: {
-      personavisitada: "",
+      personavisitada: "", // Esto almacenará el label del combobox de empleado
       purpose: "",
       category: "",
       tipodocumento: undefined,
@@ -78,11 +72,32 @@ export default function AutoregistroPage() {
       empresaProviene: "",
       numerocarnet: "",
       vehiculoPlaca: "",
-      photoDataUri: "", // Asegurarse de que photoDataUri esté en defaultValues
+      photoDataUri: "",
     },
   });
 
   const purposeValue = form.watch("purpose");
+
+  const fetchEmployeesForCombobox = async () => {
+    try {
+      const response = await fetch('/api/empleados');
+      if (!response.ok) throw new Error('Error al cargar empleados');
+      const employees: {id: string, nombreApellido: string, identificacion: string}[] = await response.json();
+      setEmployeeComboboxOptions(
+        employees.map(emp => ({
+          value: emp.id,
+          label: `${emp.nombreApellido} (ID: ${emp.identificacion})`,
+        }))
+      );
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los empleados para el selector." });
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployeesForCombobox();
+  }, []);
+
 
   const fetchCategorySuggestion = useCallback(async (purposeText: string) => {
     if (purposeText.trim().length < 10) {
@@ -123,23 +138,31 @@ export default function AutoregistroPage() {
     }
   }, [purposeValue, debouncedFetchCategory, form]);
 
-  const onSubmit: SubmitHandler<VisitorFormData> = async (data) => {
+  const onSubmit: SubmitHandler<VisitorFormData> = async (formData) => {
     setIsSubmitting(true);
-    console.log("Autoregistro Data:", data);
     
-    // Simular envío a API
-    try {
-        // const response = await fetch('/api/visitantes', { // Asumiendo que el endpoint de visitantes sirve para autoregistro
-        //     method: 'POST',
-        //     headers: {'Content-Type': 'application/json'},
-        //     body: JSON.stringify(data)
-        // });
-        // if (!response.ok) {
-        //     const errorData = await response.json();
-        //     throw new Error(errorData.message || "Error al enviar el registro.");
-        // }
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulación de API
+    const selectedEmployee = employeeComboboxOptions.find(opt => opt.label === formData.personavisitada);
+    const personavisitadaId = selectedEmployee ? selectedEmployee.value : null;
 
+    const apiPayload = {
+      ...formData,
+      fechanacimiento: formData.fechanacimiento.toISOString(),
+      personavisitadaId: personavisitadaId,
+    };
+    // @ts-ignore
+    delete apiPayload.personavisitada;
+
+    try {
+        const response = await fetch('/api/visitantes', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(apiPayload)
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Error al enviar el registro.");
+        }
+        
         toast({
             title: "Autoregistro Enviado",
             description: "Su información ha sido enviada. Por favor, espere confirmación en recepción.",
@@ -209,7 +232,7 @@ export default function AutoregistroPage() {
               epsOptions={epsOptions}
               onAddEps={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
               employeeComboboxOptions={employeeComboboxOptions}
-              showScannerSection={false} // Ocultar la sección del lector físico
+              showScannerSection={false}
             />
             <div className="mt-8">
               <Button type="submit" className="w-full" disabled={isSubmitting || isCategorizing}>
@@ -232,4 +255,3 @@ export default function AutoregistroPage() {
     </div>
   );
 }
-

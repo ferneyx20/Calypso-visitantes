@@ -114,3 +114,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Error al registrar la visita', error: (error as Error).message }, { status: 500 });
   }
 }
+  

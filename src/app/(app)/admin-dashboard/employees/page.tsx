@@ -11,10 +11,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search, Pencil, Trash2 } from "lucide-react"; // Added Pencil, Trash2
+import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search, Pencil, Trash2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"; // Added AlertDialog
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -34,58 +34,90 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { notify } from "@/components/layout/app-header"; // Importar el emisor de notificaciones
 
-const employeeSchema = z.object({
+
+const employeeFormSchema = z.object({
   id: z.string().optional(),
   identificacion: z.string().min(5, { message: "La identificación debe tener al menos 5 caracteres." }),
   nombreApellido: z.string().min(3, { message: "El nombre y apellido debe tener al menos 3 caracteres." }),
   cargo: z.string().min(3, { message: "El cargo debe tener al menos 3 caracteres." }),
-  sede: z.string().min(1, { message: "Debe seleccionar una sede." }),
+  sedeId: z.string().min(1, { message: "Debe seleccionar una sede." }), 
 });
 
-type EmployeeFormData = z.infer<typeof employeeSchema>;
+type EmployeeFormData = z.infer<typeof employeeFormSchema>;
 
 interface Sede {
   id: string;
   name: string;
 }
 
-const SIMULATED_SEDES: Sede[] = [
-  { id: "sede-norte", name: "Sede Norte" },
-  { id: "sede-sur", name: "Sede Sur" },
-  { id: "sede-centro", name: "Sede Centro" },
-  { id: "sede-principal", name: "Sede Principal" },
-];
+interface EmployeeFromAPI extends EmployeeFormData {
+  id: string; 
+  sede?: { name: string }; 
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 
 export default function EmployeesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAddEmployeeDialogOpen, setIsAddEmployeeDialogOpen] = useState(false);
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
-  const [employeesList, setEmployeesList] = useState<EmployeeFormData[]>([]);
+  
+  const [employeesList, setEmployeesList] = useState<EmployeeFromAPI[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  const [editingEmployee, setEditingEmployee] = useState<EmployeeFormData | null>(null);
-  const [employeeToDelete, setEmployeeToDelete] = useState<EmployeeFormData | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeFromAPI | null>(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState<EmployeeFromAPI | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
 
-
-  useEffect(() => {
-    setAvailableSedes(SIMULATED_SEDES);
-  }, []);
-
   const manualForm = useForm<EmployeeFormData>({
-    resolver: zodResolver(employeeSchema),
+    resolver: zodResolver(employeeFormSchema),
     defaultValues: {
       identificacion: "",
       nombreApellido: "",
       cargo: "",
-      sede: "",
+      sedeId: "",
     }
   });
+
+  const fetchEmployees = async () => {
+    setIsLoadingEmployees(true);
+    try {
+      const response = await fetch('/api/empleados');
+      if (!response.ok) throw new Error('Error al cargar empleados');
+      const data: EmployeeFromAPI[] = await response.json();
+      setEmployeesList(data);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
+
+  const fetchSedes = async () => {
+    try {
+      const response = await fetch('/api/sedes');
+      if (!response.ok) throw new Error('Error al cargar sedes');
+      const data: Sede[] = await response.json();
+      setAvailableSedes(data);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar las sedes para el formulario." });
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchSedes();
+  }, []);
+
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -118,67 +150,157 @@ export default function EmployeesPage() {
     setIsUploading(false);
     toast({
       title: "Carga Exitosa (Simulada)",
-      description: `El archivo ${selectedFile.name} ha sido procesado.`,
+      description: `El archivo ${selectedFile.name} ha sido procesado. Los empleados (si son válidos) deberían aparecer en la lista.`,
     });
     setSelectedFile(null);
     const fileInput = document.getElementById('csv-upload') as HTMLInputElement;
     if (fileInput) fileInput.value = "";
   };
 
-  const handleOpenFormDialog = (employee?: EmployeeFormData) => {
+  const handleOpenFormDialog = (employee?: EmployeeFromAPI) => {
     if (employee) {
       setEditingEmployee(employee);
-      manualForm.reset(employee); // Populate form with employee data
+      manualForm.reset({
+        id: employee.id,
+        identificacion: employee.identificacion,
+        nombreApellido: employee.nombreApellido,
+        cargo: employee.cargo,
+        sedeId: employee.sedeId,
+      });
     } else {
       setEditingEmployee(null);
-      manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sede: "", id: undefined });
+      manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sedeId: "", id: undefined });
     }
     setIsAddEmployeeDialogOpen(true);
   };
 
-
   const onManualSubmit: SubmitHandler<EmployeeFormData> = async (data) => {
     setIsSubmittingManual(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (editingEmployee) {
-      setEmployeesList(prev => prev.map(emp => emp.id === editingEmployee.id ? { ...emp, ...data } : emp));
-      toast({
-        title: "Empleado Actualizado",
-        description: `El empleado "${data.nombreApellido}" ha sido actualizado.`,
-      });
-    } else {
-      const newEmployee = { ...data, id: `emp-${Date.now()}` };
-      setEmployeesList(prev => [...prev, newEmployee]);
-      toast({
-        title: "Empleado Agregado",
-        description: `El empleado "${data.nombreApellido}" ha sido agregado exitosamente.`,
-      });
-    }
+    try {
+      let response;
+      let notificationTitle = "";
+      let notificationDescription = "";
 
-    setIsSubmittingManual(false);
-    setIsAddEmployeeDialogOpen(false);
-    setEditingEmployee(null);
-    manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sede: "", id: undefined });
+      if (editingEmployee) {
+        response = await fetch(`/api/empleados/${editingEmployee.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        notificationTitle = "Empleado Actualizado";
+        notificationDescription = `El empleado ${data.nombreApellido} fue actualizado.`;
+      } else {
+        response = await fetch('/api/empleados', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        notificationTitle = "Nuevo Empleado Creado";
+        notificationDescription = `Se creó el empleado ${data.nombreApellido}.`;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || (editingEmployee ? 'Error al actualizar empleado' : 'Error al agregar empleado'));
+      }
+      
+      toast({
+        title: editingEmployee ? "Empleado Actualizado" : "Empleado Agregado",
+        description: `El empleado "${data.nombreApellido}" ha sido ${editingEmployee ? 'actualizado' : 'agregado'} exitosamente.`,
+      });
+      
+      notify.new({
+        icon: <UserPlus className="h-5 w-5 text-green-500" />,
+        title: notificationTitle,
+        description: notificationDescription,
+        type: 'employee_created',
+        read: false
+      });
+
+      fetchEmployees(); 
+      setIsAddEmployeeDialogOpen(false);
+      setEditingEmployee(null);
+      manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sedeId: "", id: undefined });
+
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+    } finally {
+      setIsSubmittingManual(false);
+    }
   };
 
-  const handleDeleteClick = (employee: EmployeeFormData) => {
+  const handleDeleteClick = (employee: EmployeeFromAPI) => {
     setEmployeeToDelete(employee);
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (employeeToDelete) {
-      setEmployeesList(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
+  const confirmDelete = async () => {
+    if (!employeeToDelete) return;
+    try {
+      const response = await fetch(`/api/empleados/${employeeToDelete.id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al eliminar empleado');
+      }
       toast({
         title: "Empleado Eliminado",
         description: `El empleado "${employeeToDelete.nombreApellido}" ha sido eliminado.`,
         variant: "destructive"
       });
+       notify.new({
+        icon: <Trash2 className="h-5 w-5 text-red-500" />,
+        title: "Empleado Eliminado",
+        description: `El empleado ${employeeToDelete.nombreApellido} fue eliminado.`,
+        type: 'user_updated', // Podría ser un tipo 'employee_deleted'
+        read: false
+      });
+      fetchEmployees(); 
       setEmployeeToDelete(null);
+    } catch (error) {
+       toast({ variant: "destructive", title: "Error al eliminar", description: (error as Error).message });
     }
     setIsDeleteDialogOpen(false);
   };
+  
+  const confirmBatchDelete = async () => {
+    if (selectedEmployeeIds.length === 0) return;
+    setIsBatchDeleting(true);
+    try {
+      const response = await fetch('/api/empleados/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedEmployeeIds }),
+      });
+      const result = await response.json();
+      if (!response.ok && response.status !== 207) { 
+        throw new Error(result.message || 'Error al eliminar empleados seleccionados');
+      }
+
+      if (response.status === 207) { 
+         toast({ title: "Resultado de Eliminación", description: result.message, duration: 7000 });
+      } else {
+         toast({ title: "Empleados Eliminados", description: result.message, variant: "destructive"});
+      }
+      
+      if (result.deletedCount && result.deletedCount > 0) {
+        notify.new({
+            icon: <Trash2 className="h-5 w-5 text-red-500" />,
+            title: "Empleados Eliminados (Lote)",
+            description: `${result.deletedCount} empleado(s) fueron eliminados.`,
+            type: 'user_updated',
+            read: false
+        });
+      }
+
+      fetchEmployees();
+      setSelectedEmployeeIds([]);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error al eliminar", description: (error as Error).message });
+    } finally {
+      setIsBatchDeleting(false);
+    }
+  };
+
 
   const handleSelectAll = (checked: boolean | "indeterminate") => {
     if (checked === true) {
@@ -207,7 +329,7 @@ export default function EmployeesPage() {
         emp.nombreApellido.toLowerCase().includes(searchTerm) ||
         emp.identificacion.includes(searchTerm) ||
         emp.cargo.toLowerCase().includes(searchTerm) ||
-        emp.sede.toLowerCase().includes(searchTerm)
+        (emp.sede?.name || '').toLowerCase().includes(searchTerm)
     );
   }, [employeesList, searchTerm]);
 
@@ -225,7 +347,7 @@ export default function EmployeesPage() {
             setIsAddEmployeeDialogOpen(isOpen);
             if (!isOpen) {
                 setEditingEmployee(null);
-                manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sede: "", id: undefined });
+                manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sedeId: "", id: undefined });
             }
         }}>
           <TooltipProvider>
@@ -294,7 +416,7 @@ export default function EmployeesPage() {
                 />
                 <FormField
                   control={manualForm.control}
-                  name="sede"
+                  name="sedeId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sede</FormLabel>
@@ -305,11 +427,11 @@ export default function EmployeesPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableSedes.map((sede) => (
-                            <SelectItem key={sede.id} value={sede.name}>
+                          {availableSedes.length > 0 ? availableSedes.map((sede) => (
+                            <SelectItem key={sede.id} value={sede.id}>
                               {sede.name}
                             </SelectItem>
-                          ))}
+                          )) : <SelectItem value="loading" disabled>Cargando sedes...</SelectItem>}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -344,8 +466,8 @@ export default function EmployeesPage() {
             <span className="text-sm text-muted-foreground">{selectedEmployeeIds.length} empleado(s) seleccionado(s)</span>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                        <Trash2 className="mr-2 h-4 w-4"/>
+                    <Button variant="destructive" size="sm" disabled={isBatchDeleting}>
+                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Trash2 className="mr-2 h-4 w-4"/>}
                         Eliminar Seleccionados
                     </Button>
                 </AlertDialogTrigger>
@@ -359,15 +481,11 @@ export default function EmployeesPage() {
                     <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
-                        onClick={() => {
-                            setEmployeesList(prev => prev.filter(emp => !selectedEmployeeIds.includes(emp.id!)));
-                            setSelectedEmployeeIds([]);
-                            toast({ title: "Empleados Eliminados", description: `${selectedEmployeeIds.length} empleado(s) han sido eliminados.`, variant: "destructive"});
-                        }}
+                        onClick={confirmBatchDelete}
                         className={selectedEmployeeIds.length > 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
-                        disabled={selectedEmployeeIds.length === 0}
+                        disabled={selectedEmployeeIds.length === 0 || isBatchDeleting}
                     >
-                        Eliminar
+                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Eliminar"}
                     </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -393,7 +511,11 @@ export default function EmployeesPage() {
           </div>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
-           {employeesList.length === 0 && !searchTerm ? (
+           {isLoadingEmployees ? (
+             <div className="mt-4 flex flex-1 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+           ) :employeesList.length === 0 && !searchTerm ? (
             <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
               <p className="text-muted-foreground">No hay empleados registrados aún.</p>
             </div>
@@ -411,6 +533,7 @@ export default function EmployeesPage() {
                         checked={isAllSelected || (isSomeSelected && 'indeterminate')}
                         onCheckedChange={handleSelectAll}
                         aria-label="Seleccionar todos los empleados"
+                        disabled={filteredEmployees.length === 0}
                       />
                     </TableHead>
                     <TableHead>Identificación</TableHead>
@@ -433,7 +556,7 @@ export default function EmployeesPage() {
                       <TableCell>{employee.identificacion}</TableCell>
                       <TableCell className="font-medium">{employee.nombreApellido}</TableCell>
                       <TableCell>{employee.cargo}</TableCell>
-                      <TableCell>{employee.sede}</TableCell>
+                      <TableCell>{employee.sede?.name || employee.sedeId}</TableCell>
                       <TableCell className="text-right">
                         <TooltipProvider>
                           <Tooltip>
@@ -460,7 +583,7 @@ export default function EmployeesPage() {
               </Table>
               {filteredEmployees.length > 5 && selectedEmployeeIds.length === 0 && (
                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Mostrando 5 de {filteredEmployees.length} empleados. Refine su búsqueda para ver más o seleccione empleados.
+                  Mostrando 5 de {filteredEmployees.length} empleados. Refine su búsqueda o seleccione empleados para ver todos los seleccionados.
                 </p>
               )}
             </div>
@@ -475,9 +598,9 @@ export default function EmployeesPage() {
             Seleccione un archivo CSV para importar la lista de empleados.
             El archivo debe tener las siguientes columnas en este orden:
             <code className="block bg-muted p-2 rounded-md my-2 text-sm">
-              identificacion,nombre y apellido,cargo,sede
+              identificacion,nombre y apellido,cargo,sede_id
             </code>
-             Asegúrese de que la primera fila contenga estas cabeceras.
+             Asegúrese de que la primera fila contenga estas cabeceras y que `sede_id` corresponda a un ID de sede existente.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -515,7 +638,7 @@ export default function EmployeesPage() {
             ) : (
               <>
                 <Upload className="mr-2 h-4 w-4" />
-                Cargar y Procesar CSV
+                Cargar y Procesar CSV (Simulado)
               </>
             )}
           </Button>
@@ -531,15 +654,17 @@ export default function EmployeesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setEmployeeToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
+            <AlertDialogCancel onClick={() => setEmployeeToDelete(null)} disabled={isBatchDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+                onClick={confirmDelete} 
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={isBatchDeleting}
+            >
+              {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }
-    

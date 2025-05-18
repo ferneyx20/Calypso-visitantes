@@ -10,7 +10,6 @@ import QRCode from "qrcode.react";
 import {
   visitorRegistrationSchema,
   type VisitorFormData,
-  type VisitorEntry,
   TIPO_DOCUMENTO,
   GENERO,
   RH,
@@ -26,23 +25,27 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Loader2, LogOut, Users, Link as LinkIcon, QrCode } from "lucide-react";
+import { Plus, Search, Loader2, LogOut, Users, Link as LinkIcon, QrCode, UserPlus, PackageCheck, PackageX } from "lucide-react";
 import VisitorRegistrationFormFields from "@/components/visitor/visitor-registration-form-fields";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { notify } from "@/components/layout/app-header"; // Importar el emisor de notificaciones
 
+interface EmployeeOption {
+  value: string; 
+  label: string; 
+}
+interface VisitorFromAPI extends VisitorFormData {
+    id: string;
+    horaentrada: Date | string; 
+    horasalida: Date | string | null;
+    estado: "activa" | "finalizada";
+    personavisitada?: { nombreApellido: string }; 
+    createdAt?: Date;
+    updatedAt?: Date;
+}
 
-// Simulación de empleados
-const SIMULATED_EMPLOYEES = [
-  { id: "emp-001", name: "Juan Pérez (Ventas)", identification: "12345678" },
-  { id: "emp-002", name: "Ana Gómez (Recepción)", identification: "87654321" },
-  { id: "emp-003", name: "Carlos López (TI)", identification: "11223344" },
-  { id: "emp-004", name: "Sofía Ramírez (RRHH)", identification: "44332211" },
-];
-
-
-// Debounce function
 const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   const debounced = (...args: Parameters<F>) => {
@@ -62,7 +65,9 @@ export default function VisitorsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
-  const [visitorEntries, setVisitorEntries] = useState<VisitorEntry[]>([]);
+  
+  const [visitorEntries, setVisitorEntries] = useState<VisitorFromAPI[]>([]);
+  const [isLoadingVisitors, setIsLoadingVisitors] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   
   const [currentUserCanManageAutoregister, setCurrentUserCanManageAutoregister] = useState(true); 
@@ -76,20 +81,18 @@ export default function VisitorsPage() {
   const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
   const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
   
-  const employeeComboboxOptions = useMemo(() => 
-    SIMULATED_EMPLOYEES.map(emp => ({
-      value: emp.id, 
-      label: `${emp.name} (ID: ${emp.identification})`, 
-    })), 
-  []);
+  const [employeeComboboxOptions, setEmployeeComboboxOptions] = useState<EmployeeOption[]>([]);
 
   const form = useForm<VisitorFormData>({
     resolver: zodResolver(visitorRegistrationSchema),
     defaultValues: {
-      personavisitada: "",
+      personavisitada: "", 
       purpose: "",
       category: "",
       tipodocumento: undefined,
+      numerodocumento: "",
+      nombres: "",
+      apellidos: "",
       genero: undefined,
       rh: undefined,
       tipovisita: undefined,
@@ -98,13 +101,56 @@ export default function VisitorsPage() {
       empresaProviene: "",
       numerocarnet: "",
       vehiculoPlaca: "",
-      photoDataUri: "", // Asegurar que photoDataUri esté en defaultValues
+      photoDataUri: "",
+      telefono: "",
+      contactoemergencianombre: "",
+      contactoemergenciaapellido: "",
+      contactoemergenciatelefono: "",
+      contactoemergenciaparentesco: "",
     },
   });
 
   const purposeValue = form.watch("purpose");
 
+  const fetchActiveVisitors = async () => {
+    setIsLoadingVisitors(true);
+    try {
+      const response = await fetch('/api/visitantes?estado=activa');
+      if (!response.ok) throw new Error('Error al cargar visitantes activos');
+      let data: VisitorFromAPI[] = await response.json();
+      data = data.map(v => ({
+        ...v,
+        horaentrada: new Date(v.horaentrada), 
+        horasalida: v.horasalida ? new Date(v.horasalida) : null
+      }));
+      setVisitorEntries(data);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+      setVisitorEntries([]);
+    } finally {
+      setIsLoadingVisitors(false);
+    }
+  };
+
+  const fetchEmployeesForCombobox = async () => {
+    try {
+      const response = await fetch('/api/empleados');
+      if (!response.ok) throw new Error('Error al cargar empleados');
+      const employees: {id: string, nombreApellido: string, identificacion: string}[] = await response.json();
+      setEmployeeComboboxOptions(
+        employees.map(emp => ({
+          value: emp.id,
+          label: `${emp.nombreApellido} (ID: ${emp.identificacion})`,
+        }))
+      );
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los empleados para el selector." });
+    }
+  };
+
   useEffect(() => {
+    fetchActiveVisitors();
+    fetchEmployeesForCombobox();
     if (typeof window !== 'undefined') {
       setAutoregisterUrl(`${window.location.origin}/autoregistro`);
     }
@@ -149,64 +195,99 @@ export default function VisitorsPage() {
     }
   }, [purposeValue, debouncedFetchCategory, form]);
 
-  const onSubmit: SubmitHandler<VisitorFormData> = async (data) => {
+  const onSubmit: SubmitHandler<VisitorFormData> = async (formData) => {
     setIsSubmitting(true);
     
-    const selectedEmployeeOption = employeeComboboxOptions.find(opt => opt.label === data.personavisitada); // Busca por label
-    const personavisitadaForEntry = selectedEmployeeOption ? selectedEmployeeOption.label : data.personavisitada;
+    const selectedEmployee = employeeComboboxOptions.find(opt => opt.label === formData.personavisitada);
+    const personavisitadaId = selectedEmployee ? selectedEmployee.value : null;
 
-
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulación API
-
-    const newEntry: VisitorEntry = {
-      ...data,
-      personavisitada: personavisitadaForEntry, 
-      id: `visit-${Date.now()}`,
-      horaentrada: new Date(),
-      horasalida: null,
-      estado: "activa",
+    const apiPayload = {
+      ...formData,
+      fechanacimiento: formData.fechanacimiento.toISOString(), 
+      personavisitadaId: personavisitadaId,
     };
-    setVisitorEntries(prev => [newEntry, ...prev]);
+    // @ts-ignore
+    delete apiPayload.personavisitada; 
 
-    toast({
-      title: "Visita Registrada",
-      description: `${data.nombres} ${data.apellidos} ha sido registrado(a).`,
-    });
-    setIsSubmitting(false);
-    setIsRegisterDialogOpen(false);
-    form.reset();
-    setSuggestedCategory(null);
+    try {
+      const response = await fetch('/api/visitantes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al registrar la visita.");
+      }
+      
+      toast({
+        title: "Visita Registrada",
+        description: `${formData.nombres} ${formData.apellidos} ha sido registrado(a).`,
+      });
+      
+      notify.new({
+        icon: <UserPlus className="h-5 w-5 text-blue-500" />,
+        title: "Nuevo Visitante Registrado",
+        description: `${formData.nombres} ${formData.apellidos} ha ingresado.`,
+        type: 'visitor_in',
+        read: false
+      });
+
+      fetchActiveVisitors(); 
+      setIsRegisterDialogOpen(false);
+      form.reset();
+      setSuggestedCategory(null);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error de Registro", description: (error as Error).message });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
-  const handleMarkExit = (visitorId: string) => {
-    setVisitorEntries(prev => 
-      prev.map(v => 
-        v.id === visitorId ? { ...v, horasalida: new Date(), estado: "finalizada" } : v
-      )
-    );
+  const handleMarkExit = async (visitorId: string) => {
     const visitor = visitorEntries.find(v => v.id === visitorId);
-    toast({
-      title: "Salida Registrada",
-      description: `Se ha registrado la salida de ${visitor?.nombres} ${visitor?.apellidos}.`
-    });
+    if (!visitor) return;
+
+    try {
+      const response = await fetch(`/api/visitantes/${visitorId}/exit`, { method: 'PUT' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al marcar salida.");
+      }
+      toast({
+        title: "Salida Registrada",
+        description: `Se ha registrado la salida de ${visitor.nombres} ${visitor.apellidos}.`
+      });
+
+      notify.new({
+          icon: <PackageX className="h-5 w-5 text-orange-500" />,
+          title: "Salida de Visitante",
+          description: `${visitor.nombres} ${visitor.apellidos} ha salido.`,
+          type: 'visitor_out',
+          read: false
+      });
+
+      fetchActiveVisitors(); 
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error al Marcar Salida", description: (error as Error).message });
+    }
   };
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value.toLowerCase());
   };
 
-  const activeVisitors = useMemo(() => {
-    return visitorEntries.filter(v => v.estado === 'activa');
-  }, [visitorEntries]);
-
   const filteredActiveVisitors = useMemo(() => {
-    if (!searchTerm) return activeVisitors;
-    return activeVisitors.filter(
-      v =>
+    if (!searchTerm) return visitorEntries.filter(v => v.estado === 'activa');
+    return visitorEntries.filter(
+      v => v.estado === 'activa' && (
         (v.nombres.toLowerCase() + " " + v.apellidos.toLowerCase()).includes(searchTerm) ||
-        v.numerodocumento.includes(searchTerm)
+        v.numerodocumento.includes(searchTerm) ||
+        (v.personavisitada?.nombreApellido || '').toLowerCase().includes(searchTerm)
+      )
     );
-  }, [activeVisitors, searchTerm]);
+  }, [visitorEntries, searchTerm]);
 
   const handleAddOptionToList = (
     optionValue: string,
@@ -263,7 +344,7 @@ export default function VisitorsPage() {
                     epsOptions={epsOptions}
                     onAddEps={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
                     employeeComboboxOptions={employeeComboboxOptions}
-                    showScannerSection={true} // Para el admin, mostrar la sección de scanner
+                    showScannerSection={true}
                   />
                   <DialogFooter className="pt-6 pr-2">
                     <DialogClose asChild>
@@ -340,7 +421,7 @@ export default function VisitorsPage() {
                     <Switch
                       id="autoregister-toggle"
                       checked={autoregisterEnabled}
-                      onCheckedChange={setAutoregisterEnabled}
+                      onCheckedChange={setAutoregisterEnabled} 
                     />
                   </div>
                 </div>
@@ -365,7 +446,7 @@ export default function VisitorsPage() {
             <Search className="h-5 w-5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Buscar por nombre completo o documento..."
+              placeholder="Buscar por nombre, documento o persona visitada..."
               value={searchTerm}
               onChange={handleSearchChange}
               className="max-w-md"
@@ -373,7 +454,11 @@ export default function VisitorsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
-          {activeVisitors.length === 0 && !searchTerm ? (
+          {isLoadingVisitors ? (
+            <div className="mt-4 flex flex-1 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+          ): visitorEntries.filter(v => v.estado === 'activa').length === 0 && !searchTerm ? (
              <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
               <p className="text-muted-foreground">No hay visitantes activos registrados.</p>
             </div>
@@ -400,7 +485,7 @@ export default function VisitorsPage() {
                       <TableCell className="font-medium">{`${visitor.nombres} ${visitor.apellidos}`}</TableCell>
                       <TableCell>{visitor.tipodocumento}</TableCell>
                       <TableCell>{visitor.numerodocumento}</TableCell>
-                      <TableCell>{visitor.personavisitada}</TableCell> 
+                      <TableCell>{visitor.personavisitada?.nombreApellido || 'N/A'}</TableCell> 
                       <TableCell>{format(new Date(visitor.horaentrada), "Pp", { locale: es })}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" onClick={() => handleMarkExit(visitor.id)}>
@@ -418,4 +503,3 @@ export default function VisitorsPage() {
     </div>
   );
 }
-

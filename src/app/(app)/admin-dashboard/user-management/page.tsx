@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserCog, Users, Search, ShieldCheck, ShieldAlert, Loader2, UserX, UserCheck as UserCheckIcon, KeyRound, Edit } from "lucide-react";
+import { UserCog, Users, Search, ShieldCheck, ShieldAlert, Loader2, UserX, UserCheck as UserCheckIcon, KeyRound, Edit, PackageCheck, CheckCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,37 +18,36 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
+import type { RolUsuarioPlataforma } from "@prisma/client"; 
+import { notify } from "@/components/layout/app-header"; // Importar el emisor de notificaciones
 
 interface SearchableEmployee {
-  id: string;
+  id: string; 
   identificacion: string;
   nombreApellido: string;
   cargo: string;
-  sede: string;
+  sede?: { name: string }; 
 }
 
-interface PlatformUser extends SearchableEmployee {
-  userId: string;
-  role: "Admin Principal" | "Administrador" | "Estándar";
+interface PlatformUserFromAPI {
+  id: string; 
+  empleadoId: string;
+  rol: RolUsuarioPlataforma;
   canManageAutoregister: boolean;
   isActive: boolean;
+  empleado: { 
+    identificacion: string;
+    nombreApellido: string;
+    cargo: string;
+    sede?: { name: string };
+  };
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const MOCK_SEARCHABLE_EMPLOYEES: SearchableEmployee[] = [
-  { id: "emp-1", identificacion: "11223344", nombreApellido: "Ana García", cargo: "Gerente de Ventas", sede: "Sede Principal" },
-  { id: "emp-2", identificacion: "55667788", nombreApellido: "Luis Torres", cargo: "Desarrollador Senior", sede: "Sede Norte" },
-  { id: "emp-3", identificacion: "99001122", nombreApellido: "Sofia Chen", cargo: "Analista de Marketing", sede: "Sede Centro" },
-  { id: "emp-4", identificacion: "12121212", nombreApellido: "Mario Bro", cargo: "Plomero", sede: "Sede Principal" },
-  { id: "emp-5", identificacion: "34343434", nombreApellido: "Luigi Sis", cargo: "Ayudante Plomero", sede: "Sede Norte" },
-  { id: "emp-6", identificacion: "56565656", nombreApellido: "Peach Queen", cargo: "Reina", sede: "Sede Principal" },
-  { id: "emp-7", identificacion: "78787878", nombreApellido: "Bowser King", cargo: "Villano", sede: "Sede Sur" },
-];
-
 const userRoleSchema = z.object({
-  employeeId: z.string(),
-  employeeName: z.string(),
-  role: z.enum(["Admin Principal", "Administrador", "Estándar"], { required_error: "Debe seleccionar un rol." }),
+  empleadoId: z.string(), 
+  rol: z.enum(["AdminPrincipal", "Administrador", "Estandar"], { required_error: "Debe seleccionar un rol." }),
 });
 type UserRoleFormData = z.infer<typeof userRoleSchema>;
 
@@ -63,19 +62,24 @@ type ChangeOtherUserPasswordFormData = z.infer<typeof changeOtherUserPasswordSch
 
 
 export default function UserManagementPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchableEmployee[]>(MOCK_SEARCHABLE_EMPLOYEES);
-  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<SearchableEmployee | null>(null);
-  const [userToChangePassword, setUserToChangePassword] = useState<PlatformUser | null>(null);
+  const [searchTermEmployee, setSearchTermEmployee] = useState("");
+  const [searchableEmployees, setSearchableEmployees] = useState<SearchableEmployee[]>([]);
+  const [isLoadingSearchable, setIsLoadingSearchable] = useState(false);
+  
+  const [platformUsers, setPlatformUsers] = useState<PlatformUserFromAPI[]>([]);
+  const [isLoadingPlatformUsers, setIsLoadingPlatformUsers] = useState(true);
+
+  const [selectedEmployeeForConversion, setSelectedEmployeeForConversion] = useState<SearchableEmployee | null>(null);
+  const [userToChangePassword, setUserToChangePassword] = useState<PlatformUserFromAPI | null>(null);
+  
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isChangeOtherPasswordDialogOpen, setIsChangeOtherPasswordDialogOpen] = useState(false);
+  
   const [isSubmittingRole, setIsSubmittingRole] = useState(false);
   const [isSubmittingOtherPassword, setIsSubmittingOtherPassword] = useState(false);
   const { toast } = useToast();
 
-  // Simulate the role of the currently logged-in user
-  const [currentUserRole] = useState<'Admin Principal' | 'Administrador' | 'Estándar'>('Admin Principal');
+  const [currentUserRole] = useState<RolUsuarioPlataforma>('AdminPrincipal');
 
 
   const roleForm = useForm<UserRoleFormData>({
@@ -87,92 +91,157 @@ export default function UserManagementPage() {
     defaultValues: { newPassword: "", confirmPassword: "" },
   });
 
-
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const term = event.target.value.toLowerCase();
-    setSearchTerm(term);
-    if (!term) {
-      setSearchResults(MOCK_SEARCHABLE_EMPLOYEES);
-      return;
+  const fetchPlatformUsers = async () => {
+    setIsLoadingPlatformUsers(true);
+    try {
+      const response = await fetch('/api/usuarios');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al cargar usuarios de plataforma');
+      }
+      const data: PlatformUserFromAPI[] = await response.json();
+      setPlatformUsers(data);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+    } finally {
+      setIsLoadingPlatformUsers(false);
     }
-    setSearchResults(
-      MOCK_SEARCHABLE_EMPLOYEES.filter(
-        emp => emp.nombreApellido.toLowerCase().includes(term) || emp.identificacion.includes(term)
-      )
-    );
   };
 
+  const fetchSearchableEmployees = async (term: string) => {
+    if (!term) {
+      setSearchableEmployees([]);
+      return;
+    }
+    setIsLoadingSearchable(true);
+    try {
+      const response = await fetch(`/api/empleados?search=${encodeURIComponent(term)}`); 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al buscar empleados');
+      }
+      const data: SearchableEmployee[] = await response.json();
+      setSearchableEmployees(data);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error de Búsqueda", description: (error as Error).message });
+      setSearchableEmployees([]);
+    } finally {
+      setIsLoadingSearchable(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlatformUsers();
+  }, []);
+  
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchTermEmployee.trim()) {
+        fetchSearchableEmployees(searchTermEmployee);
+      } else {
+        setSearchableEmployees([]);
+      }
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTermEmployee]);
+
+
   const handleOpenRoleDialog = (employee: SearchableEmployee) => {
-    setSelectedEmployee(employee);
+    setSelectedEmployeeForConversion(employee);
     roleForm.reset({
-      employeeId: employee.id,
-      employeeName: employee.nombreApellido,
-      role: undefined,
+      empleadoId: employee.id,
+      rol: undefined,
     });
     setIsRoleDialogOpen(true);
   };
 
   const onAssignRoleSubmit: SubmitHandler<UserRoleFormData> = async (data) => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployeeForConversion) return;
     setIsSubmittingRole(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch('/api/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empleadoId: data.empleadoId, rol: data.rol }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al crear usuario de plataforma');
+      }
+      toast({
+        title: "Usuario Creado",
+        description: `${selectedEmployeeForConversion.nombreApellido} ahora es un usuario de la plataforma con rol ${data.rol}.`,
+      });
+      
+      notify.new({
+        icon: <UserCheckIcon className="h-5 w-5 text-green-500" />,
+        title: "Usuario de Plataforma Creado",
+        description: `${selectedEmployeeForConversion.nombreApellido} es ahora un usuario con rol ${data.rol}.`,
+        type: 'user_created',
+        read: false
+      });
 
-    const newPlatformUser: PlatformUser = {
-      ...selectedEmployee,
-      userId: `user-${Date.now()}`,
-      role: data.role,
-      canManageAutoregister: data.role === "Admin Principal" || data.role === "Administrador",
-      isActive: true,
-    };
-    setPlatformUsers(prev => [newPlatformUser, ...prev]);
-
-    toast({
-      title: "Usuario Creado",
-      description: `${selectedEmployee.nombreApellido} ahora es un usuario de la plataforma con rol ${data.role}.`,
-    });
-    setIsSubmittingRole(false);
-    setIsRoleDialogOpen(false);
+      fetchPlatformUsers(); 
+      setIsRoleDialogOpen(false);
+      setSelectedEmployeeForConversion(null);
+      setSearchTermEmployee(""); 
+      setSearchableEmployees([]);
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+    } finally {
+      setIsSubmittingRole(false);
+    }
   };
 
-  const handleToggleAutoregisterPermission = (userId: string, enabled: boolean) => {
-    setPlatformUsers(prevUsers =>
-      prevUsers.map(u =>
-        u.userId === userId ? { ...u, canManageAutoregister: enabled } : u
-      )
-    );
-    const userName = platformUsers.find(u => u.userId === userId)?.nombreApellido || "Usuario";
-    toast({
-      title: `Permiso de Autoregistro ${enabled ? "Concedido" : "Revocado"}`,
-      description: `${userName} ${enabled ? "ahora puede" : "ya no puede"} gestionar el autoregistro.`,
-    });
+  const handleToggleUserProperty = async (userId: string, property: 'isActive' | 'canManageAutoregister', currentValue: boolean) => {
+    const user = platformUsers.find(u => u.id === userId);
+    if (!user) return;
+
+    const updatePayload: Partial<PlatformUserFromAPI> = { [property]: !currentValue };
+    
+    try {
+      const response = await fetch(`/api/usuarios/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al actualizar usuario');
+      }
+      const updatedUser = await response.json();
+      setPlatformUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+      
+      let title = "";
+      let description = "";
+      let notifIcon = <UserCheckIcon className="h-5 w-5 text-green-500" />;
+      let notifType: NotificationPayload['type'] = 'user_updated';
+
+      if (property === 'isActive') {
+        title = `Usuario ${updatedUser.isActive ? "Activado" : "Inactivado"}`;
+        description = `${user.empleado.nombreApellido} ha sido ${updatedUser.isActive ? "activado" : "inactivado"}.`;
+        notifIcon = updatedUser.isActive ? <UserCheckIcon className="h-5 w-5 text-green-500" /> : <UserX className="h-5 w-5 text-red-500" />;
+      } else if (property === 'canManageAutoregister') {
+        title = `Permiso Autoregistro ${updatedUser.canManageAutoregister ? "Concedido" : "Revocado"}`;
+        description = `${user.empleado.nombreApellido} ${updatedUser.canManageAutoregister ? "ahora puede" : "ya no puede"} gestionar el autoregistro.`;
+      }
+      toast({ title, description });
+      notify.new({ icon: notifIcon, title, description, type: notifType, read: false });
+
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error de Actualización", description: (error as Error).message });
+       fetchPlatformUsers(); 
+    }
   };
 
-  const handleToggleUserStatus = (userId: string) => {
-    let userName = "Usuario";
-    let newStatus = false;
-    setPlatformUsers(prevUsers =>
-      prevUsers.map(u => {
-        if (u.userId === userId) {
-          userName = u.nombreApellido;
-          newStatus = !u.isActive;
-          return { ...u, isActive: !u.isActive };
-        }
-        return u;
-      })
-    );
-     toast({
-      title: `Usuario ${newStatus ? "Activado" : "Inactivado"}`,
-      description: `${userName} ha sido ${newStatus ? "activado" : "inactivado"}.`,
-    });
-  };
 
-  const canChangePasswordForUser = (targetUserRole: PlatformUser['role']): boolean => {
-    if (currentUserRole === 'Admin Principal') return true;
-    if (currentUserRole === 'Administrador' && targetUserRole === 'Estándar') return true;
+  const canChangePasswordForUser = (targetUserRole: PlatformUserFromAPI['rol']): boolean => {
+    if (currentUserRole === 'AdminPrincipal') return true;
+    if (currentUserRole === 'Administrador' && targetUserRole === 'Estandar') return true;
     return false;
   };
 
-  const handleOpenChangeOtherPasswordDialog = (user: PlatformUser) => {
+  const handleOpenChangeOtherPasswordDialog = (user: PlatformUserFromAPI) => {
     setUserToChangePassword(user);
     otherPasswordForm.reset();
     setIsChangeOtherPasswordDialogOpen(true);
@@ -181,14 +250,33 @@ export default function UserManagementPage() {
   const onChangeOtherUserPasswordSubmit: SubmitHandler<ChangeOtherUserPasswordFormData> = async (data) => {
     if (!userToChangePassword) return;
     setIsSubmittingOtherPassword(true);
-    console.log(`Changing password for ${userToChangePassword.nombreApellido} to ${data.newPassword}`); // Simulate
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({
-      title: "Contraseña Cambiada (Simulado)",
-      description: `La contraseña para ${userToChangePassword.nombreApellido} ha sido actualizada.`,
-    });
-    setIsSubmittingOtherPassword(false);
-    setIsChangeOtherPasswordDialogOpen(false);
+    try {
+      const response = await fetch(`/api/usuarios/${userToChangePassword.id}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: data.newPassword }), 
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al cambiar contraseña');
+      }
+      toast({
+        title: "Contraseña Cambiada",
+        description: `La contraseña para ${userToChangePassword.empleado.nombreApellido} ha sido actualizada.`,
+      });
+      notify.new({
+          icon: <KeyRound className="h-5 w-5 text-blue-500" />,
+          title: "Contraseña Actualizada",
+          description: `Se actualizó la contraseña de ${userToChangePassword.empleado.nombreApellido}.`,
+          type: 'user_updated',
+          read: false
+      });
+    } catch (error) {
+       toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+    } finally {
+      setIsSubmittingOtherPassword(false);
+      setIsChangeOtherPasswordDialogOpen(false);
+    }
   };
 
 
@@ -215,12 +303,13 @@ export default function UserManagementPage() {
             <Input
               type="text"
               placeholder="Buscar por nombre o identificación..."
-              value={searchTerm}
-              onChange={handleSearch}
+              value={searchTermEmployee}
+              onChange={(e) => setSearchTermEmployee(e.target.value)}
               className="max-w-sm"
             />
           </div>
-          {searchResults.slice(0, 5).length > 0 ? (
+          {isLoadingSearchable && <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}
+          {!isLoadingSearchable && searchableEmployees.slice(0, 5).length > 0 ? (
             <div className="overflow-auto border rounded-md">
               <Table>
                 <TableHeader>
@@ -233,32 +322,34 @@ export default function UserManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {searchResults.slice(0, 5).map((emp) => (
+                  {searchableEmployees.slice(0, 5).map((emp) => (
                     <TableRow key={emp.id}>
                       <TableCell>{emp.identificacion}</TableCell>
                       <TableCell className="font-medium">{emp.nombreApellido}</TableCell>
                       <TableCell>{emp.cargo}</TableCell>
-                      <TableCell>{emp.sede}</TableCell>
+                      <TableCell>{emp.sede?.name || 'N/A'}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenRoleDialog(emp)}>
+                        <Button variant="outline" size="sm" onClick={() => handleOpenRoleDialog(emp)} disabled={platformUsers.some(pu => pu.empleadoId === emp.id)}>
                           <ShieldCheck className="mr-2 h-4 w-4" />
-                          Convertir a Usuario
+                          {platformUsers.some(pu => pu.empleadoId === emp.id) ? 'Ya es Usuario' : 'Convertir a Usuario'}
                         </Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              {searchResults.length > 5 && (
+              {searchableEmployees.length > 5 && (
                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Mostrando 5 de {searchResults.length} empleados. Refine su búsqueda.
+                  Mostrando 5 de {searchableEmployees.length} empleados. Refine su búsqueda.
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-4">
-              {searchTerm ? "No se encontraron empleados." : "Ingrese un término para buscar empleados."}
-            </p>
+            !isLoadingSearchable && (
+                <p className="text-muted-foreground text-center py-4">
+                {searchTermEmployee ? "No se encontraron empleados." : "Ingrese un término para buscar empleados."}
+                </p>
+            )
           )}
         </CardContent>
       </Card>
@@ -273,7 +364,11 @@ export default function UserManagementPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
-          {platformUsers.slice(0, 5).length > 0 ? (
+          {isLoadingPlatformUsers ? (
+             <div className="mt-4 flex flex-1 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+          ) : platformUsers.length > 0 ? (
             <div className="mt-4 overflow-auto">
               <Table>
                 <TableHeader>
@@ -287,29 +382,29 @@ export default function UserManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {platformUsers.slice(0, 5).map((user) => (
-                    <TableRow key={user.userId} className={cn(!user.isActive && "opacity-60")}>
-                      <TableCell className="font-medium">{user.nombreApellido}</TableCell>
-                       <TableCell>{user.identificacion}</TableCell>
+                    <TableRow key={user.id} className={cn(!user.isActive && "opacity-60")}>
+                      <TableCell className="font-medium">{user.empleado.nombreApellido}</TableCell>
+                       <TableCell>{user.empleado.identificacion}</TableCell>
                       <TableCell>
                         <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", 
-                          user.role === "Admin Principal" ? "bg-red-600/20 text-red-700 dark:text-red-400" :
-                          user.role === "Administrador" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
+                          user.rol === "AdminPrincipal" ? "bg-red-600/20 text-red-700 dark:text-red-400" :
+                          user.rol === "Administrador" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground",
                           !user.isActive && "bg-gray-200 text-gray-500"
                         )}>
-                          {user.role === "Admin Principal" ? <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> : user.role === "Administrador" ? <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> : <Users className="mr-1.5 h-3.5 w-3.5" />}
-                          {user.role}
+                          {user.rol === "AdminPrincipal" ? <ShieldAlert className="mr-1.5 h-3.5 w-3.5" /> : user.rol === "Administrador" ? <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> : <Users className="mr-1.5 h-3.5 w-3.5" />}
+                          {user.rol === "AdminPrincipal" ? "Admin Principal" : user.rol === "Estandar" ? "Estándar" : user.rol}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                            <Switch
-                            id={`autoregister-${user.userId}`}
+                            id={`autoregister-${user.id}`}
                             checked={user.canManageAutoregister}
-                            onCheckedChange={(checked) => handleToggleAutoregisterPermission(user.userId, checked)}
-                            aria-label={`Permiso de autoregistro para ${user.nombreApellido}`}
-                            disabled={!user.isActive || user.role === 'Estándar'} // Standard users cannot manage autoregister
+                            onCheckedChange={(checked) => handleToggleUserProperty(user.id, 'canManageAutoregister', user.canManageAutoregister)}
+                            aria-label={`Permiso de autoregistro para ${user.empleado.nombreApellido}`}
+                            disabled={!user.isActive || user.rol === 'Estandar'}
                           />
-                          <Label htmlFor={`autoregister-${user.userId}`} className={cn("text-xs", !user.isActive && "text-muted-foreground/50")}>
+                          <Label htmlFor={`autoregister-${user.id}`} className={cn("text-xs", !user.isActive && "text-muted-foreground/50")}>
                             {user.canManageAutoregister ? "Permitido" : "Denegado"}
                           </Label>
                         </div>
@@ -320,7 +415,7 @@ export default function UserManagementPage() {
                             <Button 
                               variant={user.isActive ? "outline" : "secondary"} 
                               size="icon" 
-                              onClick={() => handleToggleUserStatus(user.userId)}
+                              onClick={() => handleToggleUserProperty(user.id, 'isActive', user.isActive)}
                             >
                               {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheckIcon className="h-4 w-4" />}
                             </Button>
@@ -329,7 +424,7 @@ export default function UserManagementPage() {
                             <p>{user.isActive ? "Inactivar Usuario" : "Activar Usuario"}</p>
                           </TooltipContent>
                         </Tooltip>
-                         {canChangePasswordForUser(user.role) && user.isActive && (
+                         {canChangePasswordForUser(user.rol) && user.isActive && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button 
@@ -341,7 +436,7 @@ export default function UserManagementPage() {
                                         <KeyRound className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent><p>Cambiar Contraseña de {user.nombreApellido}</p></TooltipContent>
+                                <TooltipContent><p>Cambiar Contraseña de {user.empleado.nombreApellido}</p></TooltipContent>
                             </Tooltip>
                          )}
                       </TableCell>
@@ -356,9 +451,11 @@ export default function UserManagementPage() {
               )}
             </div>
           ) : (
+           !isLoadingPlatformUsers && (
             <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
               <p className="text-muted-foreground">No hay usuarios de plataforma creados.</p>
             </div>
+           )
           )}
         </CardContent>
       </Card>
@@ -366,7 +463,7 @@ export default function UserManagementPage() {
       <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Asignar Rol a: {selectedEmployee?.nombreApellido}</DialogTitle>
+            <DialogTitle>Asignar Rol a: {selectedEmployeeForConversion?.nombreApellido}</DialogTitle>
             <DialogDescription>
               Seleccione el rol para este usuario en la plataforma.
             </DialogDescription>
@@ -375,20 +472,20 @@ export default function UserManagementPage() {
             <form onSubmit={roleForm.handleSubmit(onAssignRoleSubmit)} className="space-y-4">
               <FormField
                 control={roleForm.control}
-                name="role"
+                name="rol"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rol del Usuario</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccione un rol" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Estándar">Estándar (Recepcionista)</SelectItem>
+                        <SelectItem value="Estandar">Estándar (Recepcionista)</SelectItem>
                         <SelectItem value="Administrador">Administrador</SelectItem>
-                        <SelectItem value="Admin Principal">Admin Principal</SelectItem>
+                        <SelectItem value="AdminPrincipal">Admin Principal</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -420,7 +517,7 @@ export default function UserManagementPage() {
       <Dialog open={isChangeOtherPasswordDialogOpen} onOpenChange={setIsChangeOtherPasswordDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Cambiar Contraseña para: {userToChangePassword?.nombreApellido}</DialogTitle>
+            <DialogTitle>Cambiar Contraseña para: {userToChangePassword?.empleado.nombreApellido}</DialogTitle>
             <DialogDescription>Establezca una nueva contraseña para este usuario.</DialogDescription>
           </DialogHeader>
           <Form {...otherPasswordForm}>
@@ -469,4 +566,3 @@ export default function UserManagementPage() {
     </TooltipProvider>
   );
 }
-    

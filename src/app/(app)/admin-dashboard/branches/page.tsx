@@ -26,92 +26,210 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { notify } from "@/components/layout/app-header"; // Importar el emisor de notificaciones
 
-const branchSchema = z.object({
-  id: z.string().optional(),
+const branchFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre de la sede debe tener al menos 3 caracteres." }),
   address: z.string().min(5, { message: "La dirección debe tener al menos 5 caracteres." }),
 });
 
-type BranchFormData = z.infer<typeof branchSchema>;
+type BranchFormData = z.infer<typeof branchFormSchema>;
+
+interface SedeFromAPI extends BranchFormData {
+  id: string;
+  createdAt?: Date; 
+  updatedAt?: Date; 
+}
 
 export default function BranchesPage() {
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [branchesList, setBranchesList] = useState<BranchFormData[]>([]);
-  const [editingBranch, setEditingBranch] = useState<BranchFormData | null>(null);
-  const [branchToDelete, setBranchToDelete] = useState<BranchFormData | null>(null);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(true);
+  const [branchesList, setBranchesList] = useState<SedeFromAPI[]>([]);
+  const [editingBranch, setEditingBranch] = useState<SedeFromAPI | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<SedeFromAPI | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
 
   const { toast } = useToast();
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm<BranchFormData>({
-    resolver: zodResolver(branchSchema),
+  const form = useForm<BranchFormData>({
+    resolver: zodResolver(branchFormSchema),
+    defaultValues: {
+      name: "",
+      address: "",
+    }
   });
 
-  const handleOpenFormDialog = (branch?: BranchFormData) => {
+  const fetchBranches = async () => {
+    setIsLoadingBranches(true);
+    try {
+      const response = await fetch('/api/sedes');
+      if (!response.ok) {
+        throw new Error('Error al cargar las sedes');
+      }
+      const data: SedeFromAPI[] = await response.json();
+      setBranchesList(data);
+    } catch (error) {
+      toast({
+        title: "Error al Cargar Sedes",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+      setBranchesList([]); 
+    } finally {
+      setIsLoadingBranches(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBranches();
+  }, []);
+
+  const handleOpenFormDialog = (branch?: SedeFromAPI) => {
     if (branch) {
       setEditingBranch(branch);
-      setValue("name", branch.name);
-      setValue("address", branch.address);
-      setValue("id", branch.id);
+      form.reset({ name: branch.name, address: branch.address });
     } else {
       setEditingBranch(null);
-      reset({ name: "", address: "", id: undefined });
+      form.reset({ name: "", address: "" });
     }
     setIsFormDialogOpen(true);
   };
 
   const onSubmit: SubmitHandler<BranchFormData> = async (data) => {
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+    try {
+      let response;
+      let successMessage = "";
+      let notificationTitle = "";
+      let notificationDescription = "";
 
-    if (editingBranch) {
-      // Update existing branch
-      setBranchesList(prev => prev.map(b => b.id === editingBranch.id ? { ...b, ...data } : b));
-      toast({
-        title: "Sede Actualizada",
-        description: `La sede "${data.name}" ha sido actualizada.`,
+      if (editingBranch) {
+        response = await fetch(`/api/sedes/${editingBranch.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        successMessage = `La sede "${data.name}" ha sido actualizada.`;
+        notificationTitle = "Sede Actualizada";
+        notificationDescription = `La sede ${data.name} fue actualizada.`;
+      } else {
+        response = await fetch('/api/sedes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        successMessage = `La sede "${data.name}" ha sido agregada.`;
+        notificationTitle = "Nueva Sede Creada";
+        notificationDescription = `Se creó la sede ${data.name}.`;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || (editingBranch ? 'Error al actualizar sede' : 'Error al agregar sede'));
+      }
+      
+      toast({ title: editingBranch ? "Sede Actualizada" : "Sede Agregada", description: successMessage });
+      notify.new({
+        icon: <Building2 className="h-5 w-5 text-green-500" />,
+        title: notificationTitle,
+        description: notificationDescription,
+        type: 'branch_created',
+        read: false
       });
-    } else {
-      // Add new branch
-      const newBranch = { ...data, id: `branch-${Date.now()}` };
-      setBranchesList(prev => [...prev, newBranch]);
+      await fetchBranches(); 
+      setIsFormDialogOpen(false);
+      setEditingBranch(null);
+      form.reset({ name: "", address: ""});
+
+    } catch (error) {
       toast({
-        title: "Sede Agregada",
-        description: `La sede "${data.name}" ha sido agregada.`,
+        title: "Error",
+        description: (error as Error).message,
+        variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
-    setIsFormDialogOpen(false);
-    setEditingBranch(null);
-    reset({ name: "", address: "", id: undefined });
   };
 
-  const handleDeleteClick = (branch: BranchFormData) => {
+  const handleDeleteClick = (branch: SedeFromAPI) => {
     setBranchToDelete(branch);
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (branchToDelete) {
-      setBranchesList(prev => prev.filter(b => b.id !== branchToDelete.id));
+  const confirmDelete = async () => {
+    if (!branchToDelete) return;
+    setIsSubmitting(true); 
+    try {
+      const response = await fetch(`/api/sedes/${branchToDelete.id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al eliminar la sede.");
+      }
       toast({
         title: "Sede Eliminada",
         description: `La sede "${branchToDelete.name}" ha sido eliminada.`,
         variant: "destructive"
       });
+      notify.new({
+        icon: <Trash2 className="h-5 w-5 text-red-500" />,
+        title: "Sede Eliminada",
+        description: `La sede ${branchToDelete.name} fue eliminada.`,
+        type: 'branch_deleted',
+        read: false
+      });
+      await fetchBranches(); 
       setBranchToDelete(null);
+    } catch (error) {
+       toast({ variant: "destructive", title: "Error al eliminar", description: (error as Error).message });
+    } finally {
+      setIsSubmitting(false);
+      setIsDeleteDialogOpen(false);
     }
-    setIsDeleteDialogOpen(false);
+  };
+
+  const confirmBatchDelete = async () => {
+    if (selectedBranchIds.length === 0) return;
+    setIsBatchDeleting(true);
+    try {
+      const response = await fetch('/api/sedes/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedBranchIds }),
+      });
+      const result = await response.json();
+
+      if (!response.ok && response.status !== 207) {
+        throw new Error(result.message || 'Error al eliminar sedes seleccionadas');
+      }
+      
+      if (response.status === 207) { 
+         toast({ title: "Resultado de Eliminación", description: result.message, duration: 7000 });
+      } else { 
+         toast({ title: "Sedes Eliminadas", description: result.message });
+      }
+
+      if (result.deletedCount && result.deletedCount > 0) {
+        notify.new({
+            icon: <Trash2 className="h-5 w-5 text-red-500" />,
+            title: "Sedes Eliminadas (Lote)",
+            description: `${result.deletedCount} sede(s) fueron eliminadas.`,
+            type: 'branch_deleted',
+            read: false
+        });
+      }
+      
+      await fetchBranches();
+      setSelectedBranchIds([]);
+
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error al eliminar", description: (error as Error).message });
+    } finally {
+      setIsBatchDeleting(false);
+    }
   };
 
   const handleSelectAll = (checked: boolean | "indeterminate") => {
@@ -145,7 +263,7 @@ export default function BranchesPage() {
             setIsFormDialogOpen(isOpen);
             if (!isOpen) {
               setEditingBranch(null);
-              reset({ name: "", address: "", id: undefined });
+              form.reset({ name: "", address: "" });
             }
           }}>
           <TooltipProvider>
@@ -168,24 +286,24 @@ export default function BranchesPage() {
                 {editingBranch ? "Modifique los detalles de la sede." : "Complete los detalles de la nueva sede."}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Nombre de la Sede</Label>
                 <Input
                   id="name"
                   placeholder="Ej: Sede Principal, Sucursal Centro"
-                  {...register("name")}
+                  {...form.register("name")}
                 />
-                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                {form.formState.errors.name && <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Dirección de la Sede</Label>
                 <Input
                   id="address"
                   placeholder="Ej: Calle Falsa 123, Ciudad"
-                  {...register("address")}
+                  {...form.register("address")}
                 />
-                {errors.address && <p className="text-sm text-destructive">{errors.address.message}</p>}
+                {form.formState.errors.address && <p className="text-sm text-destructive">{form.formState.errors.address.message}</p>}
               </div>
               <DialogFooter>
                 <DialogClose asChild>
@@ -214,8 +332,8 @@ export default function BranchesPage() {
             <span className="text-sm text-muted-foreground">{selectedBranchIds.length} sede(s) seleccionada(s)</span>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                        <Trash2 className="mr-2 h-4 w-4"/>
+                    <Button variant="destructive" size="sm" disabled={isBatchDeleting}>
+                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Trash2 className="mr-2 h-4 w-4"/>}
                         Eliminar Seleccionadas
                     </Button>
                 </AlertDialogTrigger>
@@ -229,15 +347,11 @@ export default function BranchesPage() {
                     <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
-                        onClick={() => {
-                            setBranchesList(prev => prev.filter(b => !selectedBranchIds.includes(b.id!)));
-                            setSelectedBranchIds([]);
-                            toast({ title: "Sedes Eliminadas", description: `${selectedBranchIds.length} sede(s) han sido eliminadas.`, variant: "destructive"});
-                        }}
+                        onClick={confirmBatchDelete}
                         className={selectedBranchIds.length > 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
-                        disabled={selectedBranchIds.length === 0}
+                        disabled={selectedBranchIds.length === 0 || isBatchDeleting}
                     >
-                        Eliminar
+                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Eliminar"}
                     </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -253,7 +367,11 @@ export default function BranchesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
-          {branchesList.length > 0 ? (
+          {isLoadingBranches ? (
+             <div className="mt-4 flex flex-1 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+          ) : branchesList.length > 0 ? (
             <div className="mt-4 overflow-auto">
               <Table>
                 <TableHeader>
@@ -263,6 +381,7 @@ export default function BranchesPage() {
                         checked={isAllSelected || (isSomeSelected && 'indeterminate')}
                         onCheckedChange={handleSelectAll}
                         aria-label="Seleccionar todas las filas"
+                        disabled={branchesList.length === 0}
                       />
                     </TableHead>
                     <TableHead>Nombre</TableHead>
@@ -324,9 +443,9 @@ export default function BranchesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setBranchToDelete(null)}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar
+            <AlertDialogCancel onClick={() => setBranchToDelete(null)} disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -334,5 +453,4 @@ export default function BranchesPage() {
     </div>
   );
 }
-
     

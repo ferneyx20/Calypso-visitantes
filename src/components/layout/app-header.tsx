@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Bell, Sun, Moon, UserPlus, UserCheck, FilePenLine, AlarmClockOff, Trash2, LogOut, KeyRound, Image as ImageIcon, Edit3, ShieldQuestion } from "lucide-react";
+import { Bell, Sun, Moon, UserPlus, UserCheck, FilePenLine, AlarmClockOff, Trash2, LogOut, KeyRound, ImageIcon, Edit3, ShieldQuestion, Building2, UserX, CheckCircle, Info, PackageCheck, PackageX } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +36,7 @@ interface NotificationItem {
   description: string;
   timestamp: string;
   read?: boolean;
+  type?: 'info' | 'success' | 'warning' | 'error' | 'visitor_in' | 'visitor_out' | 'user_created' | 'user_updated' | 'branch_created' | 'branch_deleted' | 'employee_created';
 }
 
 const timeAgo = (date: Date): string => {
@@ -53,12 +54,25 @@ const timeAgo = (date: Date): string => {
   return `Hace ${Math.floor(seconds)} seg`;
 };
 
-const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  { id: "1", icon: <UserPlus className="h-5 w-5 text-blue-500" />, title: "Nuevo Visitante", description: "Ana García ha ingresado a Sede Principal.", timestamp: timeAgo(new Date(Date.now() - 5 * 60 * 1000)), read: false },
-  { id: "2", icon: <UserCheck className="h-5 w-5 text-green-500" />, title: "Usuario Activado", description: "Carlos López ahora tiene acceso al sistema.", timestamp: timeAgo(new Date(Date.now() - 15 * 60 * 1000)), read: false },
-  { id: "3", icon: <FilePenLine className="h-5 w-5 text-orange-500" />, title: "Autoregistro Pendiente", description: "Un visitante (ID: AR-123) espera aprobación.", timestamp: timeAgo(new Date(Date.now() - 60 * 60 * 1000)), read: true },
-  { id: "4", icon: <AlarmClockOff className="h-5 w-5 text-red-500" />, title: "Visita Prolongada", description: "Luis Torres (Sede Norte) lleva 25 horas activo.", timestamp: timeAgo(new Date(Date.now() - 2 * 60 * 60 * 1000)), read: false },
-];
+// Simple event emitter for notifications
+type NotificationPayload = Omit<NotificationItem, 'id' | 'timestamp'>;
+let notificationListeners: Array<(notification: NotificationPayload) => void> = [];
+
+const notify = {
+  new: (data: NotificationPayload) => {
+    notificationListeners.forEach(listener => listener(data));
+  },
+  subscribe: (listener: (notification: NotificationPayload) => void) => {
+    notificationListeners.push(listener);
+    return () => {
+      notificationListeners = notificationListeners.filter(l => l !== listener);
+    };
+  }
+};
+
+// Export for use in other components
+export { notify, type NotificationPayload, type NotificationItem };
+
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Contraseña actual es requerida."),
@@ -80,11 +94,10 @@ export default function AppHeader() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
 
-  // Simulated user data
   const currentUser = {
-    name: "Admin Usuario", // Placeholder
-    role: "Admin Principal", // Placeholder, can be 'Admin Principal', 'Administrador', 'Estándar'
-    avatarUrl: "", // Placeholder for avatar image URL
+    name: "Admin Usuario", 
+    role: "Admin Principal", 
+    avatarUrl: "", 
     initials: "AU"
   };
 
@@ -116,8 +129,18 @@ export default function AppHeader() {
   }, [isDark, isMounted]);
   
   useEffect(() => {
-    // Simulate fetching notifications
-    setNotifications(MOCK_NOTIFICATIONS);
+    // Removed MOCK_NOTIFICATIONS initialization
+    const unsubscribe = notify.subscribe((newNotificationData) => {
+      setNotifications(prev => [
+        {
+          ...newNotificationData,
+          id: `notif-${Date.now()}-${Math.random()}`,
+          timestamp: timeAgo(new Date()),
+        },
+        ...prev
+      ].slice(0, 20)); // Keep max 20 notifications
+    });
+    return () => unsubscribe();
   }, []);
 
 
@@ -129,13 +152,8 @@ export default function AppHeader() {
     toast({ title: "Cerrando Sesión", description: "Has cerrado sesión exitosamente." });
     try {
       await logoutAction();
-      // The redirect is handled by the server action.
-      // router.refresh() can be called to ensure client state is fully updated if necessary,
-      // but the server-side redirect should typically handle this.
       router.refresh(); 
     } catch (error) {
-      // This catch block might not be reached for redirect errors,
-      // as Next.js handles those. But it's good for other potential action errors.
       console.error("Logout failed:", error);
       toast({ title: "Error al Cerrar Sesión", variant: "destructive" });
     }
@@ -147,7 +165,7 @@ export default function AppHeader() {
 
   const onSubmitPasswordChange: SubmitHandler<ChangePasswordFormData> = async (data) => {
     setIsSubmittingPassword(true);
-    console.log("Password change data:", data); // Simulate API call
+    console.log("Password change data:", data); 
     await new Promise(resolve => setTimeout(resolve, 1500));
     toast({ title: "Contraseña Cambiada", description: "Tu contraseña ha sido actualizada (simulado)." });
     setIsSubmittingPassword(false);
@@ -157,8 +175,8 @@ export default function AppHeader() {
 
   return (
     <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-      <div className="flex h-16 w-full items-center justify-between px-4 md:px-6">
-        <div className="flex items-center gap-2">
+      <div className="container mx-auto flex h-16 w-full items-center px-4 md:px-6">
+        <div className="flex-1 flex items-center gap-2">
           <SidebarTrigger className="md:hidden" />
           <h1 className="text-lg font-semibold text-foreground md:text-xl">Registro de Visitantes</h1>
         </div>
@@ -169,8 +187,9 @@ export default function AppHeader() {
             onClick={toggleDarkMode}
             aria-label="Toggle theme"
             disabled={!isMounted}
+            className="text-foreground hover:bg-muted/50"
           >
-            {isMounted ? (isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />) : (<span className="h-5 w-5 block" />)}
+             {isMounted ? (isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />) : (<span className="h-5 w-5 block" />)}
           </Button>
 
           <DropdownMenu>
@@ -179,7 +198,7 @@ export default function AppHeader() {
                 <Bell className="h-5 w-5" />
                 {isMounted && unreadCount > 0 && (
                   <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs">
-                    {unreadCount}
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </Badge>
                 )}
               </Button>
@@ -337,5 +356,3 @@ export default function AppHeader() {
     </header>
   );
 }
-
-    

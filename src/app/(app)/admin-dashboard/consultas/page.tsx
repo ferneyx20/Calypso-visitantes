@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
-import { Calendar as CalendarIcon, Search, FileDown, History } from "lucide-react"; // Added History
+import { Calendar as CalendarIcon, Search, FileDown, History, Loader2 } from "lucide-react"; 
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,70 +13,79 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-// Simulación de datos de visitas pasadas
-interface PastVisitorEntry {
-  id: string;
-  nombres: string;
-  apellidos: string;
-  numerodocumento: string;
-  personavisitada: string;
-  horaentrada: Date;
-  horasalida: Date | null;
-  purpose: string;
-  category?: string;
+interface VisitorFromAPI {
+    id: string;
+    nombres: string;
+    apellidos: string;
+    numerodocumento: string;
+    personavisitada?: { nombreApellido: string };
+    horaentrada: string | Date; // API might return string
+    horasalida?: string | Date | null; // API might return string
+    purpose: string;
+    category?: string;
+    tipodocumento: string;
+    empresaProviene?: string;
+    // Otros campos del visitante si son necesarios para la tabla
 }
-
-const MOCK_PAST_VISITS: PastVisitorEntry[] = [
-  { id: "pv-1", nombres: "Luisa", apellidos: "Fernandez", numerodocumento: "10203040", personavisitada: "Ana Gómez (Recepción)", horaentrada: new Date(2023, 10, 15, 9, 0), horasalida: new Date(2023, 10, 15, 10, 30), purpose: "Entrega de propuesta comercial", category: "Proveedor" },
-  { id: "pv-2", nombres: "Pedro", apellidos: "Ramirez", numerodocumento: "50607080", personavisitada: "Carlos López (TI)", horaentrada: new Date(2023, 11, 1, 14, 0), horasalida: new Date(2023, 11, 1, 15, 0), purpose: "Soporte técnico equipo", category: "Contratista" },
-  { id: "pv-3", nombres: "Elena", apellidos: "Vargas", numerodocumento: "90102030", personavisitada: "Juan Pérez (Ventas)", horaentrada: new Date(2024, 0, 20, 11, 0), horasalida: null, purpose: "Reunión de seguimiento", category: "Cliente" } // Changed new Date() to a fixed date
-];
 
 
 export default function ConsultasPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [searchResults, setSearchResults] = useState<PastVisitorEntry[]>([]);
+  
+  const [searchResults, setSearchResults] = useState<VisitorFromAPI[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = () => {
-    // Simulación de búsqueda y filtrado
+  const handleSearch = async () => {
+    setIsLoading(true);
     setHasSearched(true);
-    let results = MOCK_PAST_VISITS;
+    try {
+      const queryParams = new URLSearchParams();
+      if (searchTerm) queryParams.append('search', searchTerm);
+      if (dateRange?.from) queryParams.append('from', dateRange.from.toISOString());
+      if (dateRange?.to) {
+          const toDate = new Date(dateRange.to);
+          toDate.setHours(23, 59, 59, 999); // Incluir todo el día "to"
+          queryParams.append('to', toDate.toISOString());
+      }
+      // queryParams.append('estado', 'finalizada'); // Opcional: buscar solo finalizadas o todas
 
-    if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      results = results.filter(
-        (visit) =>
-          (visit.nombres.toLowerCase() + " " + visit.apellidos.toLowerCase()).includes(lowerSearchTerm) ||
-          visit.numerodocumento.includes(lowerSearchTerm) ||
-          visit.personavisitada.toLowerCase().includes(lowerSearchTerm)
-      );
-    }
+      const response = await fetch(`/api/visitantes?${queryParams.toString()}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al buscar visitas');
+      }
+      let data: VisitorFromAPI[] = await response.json();
+      data = data.map(v => ({
+        ...v,
+        horaentrada: new Date(v.horaentrada),
+        horasalida: v.horasalida ? new Date(v.horasalida) : null
+      }));
+      setSearchResults(data);
 
-    if (dateRange?.from) {
-      results = results.filter((visit) => new Date(visit.horaentrada) >= dateRange.from!);
-    }
-    if (dateRange?.to) {
-      // Adjust 'to' date to include the whole day
-      const toDate = new Date(dateRange.to);
-      toDate.setHours(23, 59, 59, 999);
-      results = results.filter((visit) => new Date(visit.horaentrada) <= toDate);
-    }
-    setSearchResults(results);
-    if (results.length === 0) {
-        toast({title: "Sin Resultados", description: "No se encontraron visitas con los criterios seleccionados."})
+      if (data.length === 0) {
+          toast({title: "Sin Resultados", description: "No se encontraron visitas con los criterios seleccionados."})
+      } else {
+          toast({title: "Búsqueda Completa", description: `Se encontraron ${data.length} visita(s).`})
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error de Búsqueda", description: (error as Error).message });
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleExport = (format: "Excel" | "PDF") => {
+  const handleExport = (formatType: "Excel" | "PDF") => {
     toast({
-      title: `Exportar a ${format} (Simulado)`,
-      description: `La funcionalidad de exportar a ${format} aún no está implementada.`,
+      title: `Exportar a ${formatType} (Simulado)`,
+      description: `La funcionalidad de exportar a ${formatType} aún no está implementada. Se exportarían ${searchResults.length} registros.`,
     });
   };
 
@@ -102,7 +111,7 @@ export default function ConsultasPage() {
               <Label htmlFor="search-term">Término de Búsqueda</Label>
               <Input
                 id="search-term"
-                placeholder="Nombre, documento, persona visitada..."
+                placeholder="Nombre, documento, empresa..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -149,8 +158,8 @@ export default function ConsultasPage() {
               </Popover>
             </div>
 
-            <Button onClick={handleSearch} className="lg:self-end">
-              <Search className="mr-2 h-4 w-4" />
+            <Button onClick={handleSearch} className="lg:self-end" disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Search className="mr-2 h-4 w-4" />}
               Buscar Visitas
             </Button>
           </div>
@@ -165,33 +174,52 @@ export default function ConsultasPage() {
                 <CardDescription>Visitas encontradas según los criterios de búsqueda.</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => handleExport("Excel")}>
+              <Button variant="outline" onClick={() => handleExport("Excel")} disabled={searchResults.length === 0 || isLoading}>
                 <FileDown className="mr-2 h-4 w-4" /> Exportar a Excel
               </Button>
-              <Button variant="outline" onClick={() => handleExport("PDF")}>
+              <Button variant="outline" onClick={() => handleExport("PDF")} disabled={searchResults.length === 0 || isLoading}>
                 <FileDown className="mr-2 h-4 w-4" /> Exportar a PDF
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
-          { !hasSearched ? (
+          {isLoading ? (
+            <div className="mt-4 flex flex-1 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : !hasSearched ? (
              <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
                 <p className="text-muted-foreground">Ingrese criterios y presione "Buscar Visitas" para ver resultados.</p>
             </div>
           ) : searchResults.length > 0 ? (
             <div className="mt-4 overflow-auto">
-              {/* Aquí iría la tabla de resultados. Por ahora un placeholder. */}
-              <p className="text-sm text-muted-foreground">
-                Mostrando {searchResults.length} visita(s) pasada(s). (Tabla de detalles próximamente)
-              </p>
-              <ul className="mt-2 space-y-1">
-                {searchResults.map(visit => (
-                    <li key={visit.id} className="text-xs p-2 border rounded-md bg-muted/30">
-                       {visit.nombres} {visit.apellidos} (Doc: {visit.numerodocumento}) - Visitó a: {visit.personavisitada} el {format(visit.horaentrada, "Pp", {locale: es})}
-                    </li>
-                ))}
-              </ul>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre Completo</TableHead>
+                    <TableHead>Documento</TableHead>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Persona Visitada</TableHead>
+                    <TableHead>Entrada</TableHead>
+                    <TableHead>Salida</TableHead>
+                    <TableHead>Propósito</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {searchResults.map(visit => (
+                      <TableRow key={visit.id}>
+                        <TableCell className="font-medium">{`${visit.nombres} ${visit.apellidos}`}</TableCell>
+                        <TableCell>{`${visit.tipodocumento} ${visit.numerodocumento}`}</TableCell>
+                        <TableCell>{visit.empresaProviene || 'N/A'}</TableCell>
+                        <TableCell>{visit.personavisitada?.nombreApellido || 'N/A'}</TableCell>
+                        <TableCell>{format(new Date(visit.horaentrada), "Pp", {locale: es})}</TableCell>
+                        <TableCell>{visit.horasalida ? format(new Date(visit.horasalida), "Pp", {locale: es}) : 'Activa'}</TableCell>
+                        <TableCell className="max-w-xs truncate">{visit.purpose}</TableCell>
+                      </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <div className="mt-4 flex flex-1 items-center justify-center border-2 border-dashed border-border rounded-lg bg-card">
