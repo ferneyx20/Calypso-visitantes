@@ -11,9 +11,21 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search } from "lucide-react";
+import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search, Pencil, Trash2 } from "lucide-react"; // Added Pencil, Trash2
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"; // Added AlertDialog
 import {
   Select,
   SelectContent,
@@ -55,8 +67,13 @@ export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeFormData | null>(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState<EmployeeFormData | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+
+
   useEffect(() => {
-    // Simular carga de sedes disponibles (en una app real, esto vendría de una API)
     setAvailableSedes(SIMULATED_SEDES);
   }, []);
 
@@ -82,7 +99,7 @@ export default function EmployeesPage() {
           variant: "destructive",
         });
         setSelectedFile(null);
-        event.target.value = ""; // Reset file input
+        event.target.value = ""; 
       }
     }
   };
@@ -97,7 +114,6 @@ export default function EmployeesPage() {
       return;
     }
     setIsUploading(true);
-    // Simular carga de archivo
     await new Promise(resolve => setTimeout(resolve, 2000));
     setIsUploading(false);
     toast({
@@ -109,23 +125,77 @@ export default function EmployeesPage() {
     if (fileInput) fileInput.value = "";
   };
 
-  const onManualSubmit: SubmitHandler<EmployeeFormData> = async (data) => {
-    setIsSubmittingManual(true);
-    // Simular llamada a API
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newEmployee = { ...data, id: `emp-${Date.now()}` };
-    setEmployeesList(prev => [...prev, newEmployee]);
-
-    toast({
-      title: "Empleado Agregado",
-      description: `El empleado "${data.nombreApellido}" ha sido agregado exitosamente.`,
-    });
-    setIsSubmittingManual(false);
-    setIsAddEmployeeDialogOpen(false);
-    manualForm.reset();
+  const handleOpenFormDialog = (employee?: EmployeeFormData) => {
+    if (employee) {
+      setEditingEmployee(employee);
+      manualForm.reset(employee); // Populate form with employee data
+    } else {
+      setEditingEmployee(null);
+      manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sede: "", id: undefined });
+    }
+    setIsAddEmployeeDialogOpen(true);
   };
 
+
+  const onManualSubmit: SubmitHandler<EmployeeFormData> = async (data) => {
+    setIsSubmittingManual(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (editingEmployee) {
+      setEmployeesList(prev => prev.map(emp => emp.id === editingEmployee.id ? { ...emp, ...data } : emp));
+      toast({
+        title: "Empleado Actualizado",
+        description: `El empleado "${data.nombreApellido}" ha sido actualizado.`,
+      });
+    } else {
+      const newEmployee = { ...data, id: `emp-${Date.now()}` };
+      setEmployeesList(prev => [...prev, newEmployee]);
+      toast({
+        title: "Empleado Agregado",
+        description: `El empleado "${data.nombreApellido}" ha sido agregado exitosamente.`,
+      });
+    }
+
+    setIsSubmittingManual(false);
+    setIsAddEmployeeDialogOpen(false);
+    setEditingEmployee(null);
+    manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sede: "", id: undefined });
+  };
+
+  const handleDeleteClick = (employee: EmployeeFormData) => {
+    setEmployeeToDelete(employee);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (employeeToDelete) {
+      setEmployeesList(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
+      toast({
+        title: "Empleado Eliminado",
+        description: `El empleado "${employeeToDelete.nombreApellido}" ha sido eliminado.`,
+        variant: "destructive"
+      });
+      setEmployeeToDelete(null);
+    }
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleSelectAll = (checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedEmployeeIds(filteredEmployees.map(emp => emp.id!));
+    } else {
+      setSelectedEmployeeIds([]);
+    }
+  };
+
+  const handleRowSelect = (employeeId: string, checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedEmployeeIds(prev => [...prev, employeeId]);
+    } else {
+      setSelectedEmployeeIds(prev => prev.filter(id => id !== employeeId));
+    }
+  };
+  
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value.toLowerCase());
   };
@@ -135,27 +205,36 @@ export default function EmployeesPage() {
     return employeesList.filter(
       emp =>
         emp.nombreApellido.toLowerCase().includes(searchTerm) ||
-        emp.identificacion.includes(searchTerm)
+        emp.identificacion.includes(searchTerm) ||
+        emp.cargo.toLowerCase().includes(searchTerm) ||
+        emp.sede.toLowerCase().includes(searchTerm)
     );
   }, [employeesList, searchTerm]);
 
+  const isAllSelected = filteredEmployees.length > 0 && selectedEmployeeIds.length === filteredEmployees.length;
+  const isSomeSelected = selectedEmployeeIds.length > 0 && selectedEmployeeIds.length < filteredEmployees.length;
+
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h1 className="text-3xl font-semibold flex items-center">
           <UsersRound className="mr-3 h-8 w-8 text-primary" />
           Gestión de Empleados
         </h1>
-        <Dialog open={isAddEmployeeDialogOpen} onOpenChange={setIsAddEmployeeDialogOpen}>
+        <Dialog open={isAddEmployeeDialogOpen} onOpenChange={(isOpen) => {
+            setIsAddEmployeeDialogOpen(isOpen);
+            if (!isOpen) {
+                setEditingEmployee(null);
+                manualForm.reset({ identificacion: "", nombreApellido: "", cargo: "", sede: "", id: undefined });
+            }
+        }}>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Agregar Empleado
-                  </Button>
-                </DialogTrigger>
+                <Button variant="outline" onClick={() => handleOpenFormDialog()}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Empleado
+                </Button>
               </TooltipTrigger>
               <TooltipContent>
                 <p>Agregar Nuevo Empleado Manualmente</p>
@@ -166,10 +245,10 @@ export default function EmployeesPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center">
                 <UserPlus className="mr-2 h-5 w-5 text-primary" />
-                Agregar Nuevo Empleado
+                {editingEmployee ? "Editar Empleado" : "Agregar Nuevo Empleado"}
               </DialogTitle>
               <DialogDescription>
-                Complete los detalles del nuevo empleado a continuación.
+                {editingEmployee ? "Modifique los detalles del empleado." : "Complete los detalles del nuevo empleado."}
               </DialogDescription>
             </DialogHeader>
             <Form {...manualForm}>
@@ -219,7 +298,7 @@ export default function EmployeesPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sede</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Seleccione una sede" />
@@ -227,7 +306,7 @@ export default function EmployeesPage() {
                         </FormControl>
                         <SelectContent>
                           {availableSedes.map((sede) => (
-                            <SelectItem key={sede.id} value={sede.name}> {/* Usar sede.name como valor para consistencia con lo que se guarda */}
+                            <SelectItem key={sede.id} value={sede.name}>
                               {sede.name}
                             </SelectItem>
                           ))}
@@ -247,10 +326,10 @@ export default function EmployeesPage() {
                     {isSubmittingManual ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
+                        {editingEmployee ? "Actualizando..." : "Guardando..."}
                       </>
                     ) : (
-                      "Guardar Empleado"
+                      editingEmployee ? "Actualizar Empleado" : "Guardar Empleado"
                     )}
                   </Button>
                 </DialogFooter>
@@ -260,17 +339,53 @@ export default function EmployeesPage() {
         </Dialog>
       </div>
 
+      {selectedEmployeeIds.length > 0 && (
+        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md border">
+            <span className="text-sm text-muted-foreground">{selectedEmployeeIds.length} empleado(s) seleccionado(s)</span>
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                        <Trash2 className="mr-2 h-4 w-4"/>
+                        Eliminar Seleccionados
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta acción eliminará permanentemente {selectedEmployeeIds.length} empleado(s) seleccionado(s). Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={() => {
+                            setEmployeesList(prev => prev.filter(emp => !selectedEmployeeIds.includes(emp.id!)));
+                            setSelectedEmployeeIds([]);
+                            toast({ title: "Empleados Eliminados", description: `${selectedEmployeeIds.length} empleado(s) han sido eliminados.`, variant: "destructive"});
+                        }}
+                        className={selectedEmployeeIds.length > 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+                        disabled={selectedEmployeeIds.length === 0}
+                    >
+                        Eliminar
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+      )}
+
       <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Lista de Empleados</CardTitle>
           <CardDescription>
-            Aquí se mostrará la tabla con los empleados registrados (máximo 5 mostrados). Puede buscar por nombre o identificación.
+            Aquí se mostrará la tabla con los empleados registrados. Puede buscar, editar o eliminar empleados.
           </CardDescription>
           <div className="flex items-center gap-2 pt-4">
             <Search className="h-5 w-5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Buscar por nombre o identificación..."
+              placeholder="Buscar por nombre, identificación, cargo o sede..."
               value={searchTerm}
               onChange={handleSearchChange}
               className="max-w-sm"
@@ -291,26 +406,61 @@ export default function EmployeesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected || (isSomeSelected && 'indeterminate')}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Seleccionar todos los empleados"
+                      />
+                    </TableHead>
                     <TableHead>Identificación</TableHead>
                     <TableHead>Nombre y Apellido</TableHead>
                     <TableHead>Cargo</TableHead>
                     <TableHead>Sede</TableHead>
+                    <TableHead className="text-right w-[120px]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.slice(0, 5).map((employee) => (
-                    <TableRow key={employee.id}>
+                  {filteredEmployees.slice(0, selectedEmployeeIds.length > 0 ? filteredEmployees.length : 5).map((employee) => (
+                    <TableRow key={employee.id} data-state={selectedEmployeeIds.includes(employee.id!) ? "selected" : ""}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedEmployeeIds.includes(employee.id!)}
+                          onCheckedChange={(checked) => handleRowSelect(employee.id!, checked)}
+                          aria-label={`Seleccionar empleado ${employee.nombreApellido}`}
+                        />
+                      </TableCell>
                       <TableCell>{employee.identificacion}</TableCell>
                       <TableCell className="font-medium">{employee.nombreApellido}</TableCell>
                       <TableCell>{employee.cargo}</TableCell>
                       <TableCell>{employee.sede}</TableCell>
+                      <TableCell className="text-right">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenFormDialog(employee)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Editar Empleado</p></TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(employee)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Eliminar Empleado</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-              {filteredEmployees.length > 5 && (
+              {filteredEmployees.length > 5 && selectedEmployeeIds.length === 0 && (
                 <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Mostrando 5 de {filteredEmployees.length} empleados. Refine su búsqueda para ver más.
+                  Mostrando 5 de {filteredEmployees.length} empleados. Refine su búsqueda para ver más o seleccione empleados.
                 </p>
               )}
             </div>
@@ -372,8 +522,24 @@ export default function EmployeesPage() {
         </CardFooter>
       </Card>
 
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro de eliminar este empleado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el empleado "{employeeToDelete?.nombreApellido}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEmployeeToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
-
     
