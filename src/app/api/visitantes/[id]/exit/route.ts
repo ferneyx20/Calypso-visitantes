@@ -1,13 +1,13 @@
 // src/app/api/visitantes/[id]/exit/route.ts
 import { type NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import prisma from '@/lib/prisma'; // Importar Prisma Client
 
 // PUT /api/visitantes/[id]/exit - Marcar salida de un visitante
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id } = params; // El ID del visitante de la URL
+  const { id } = params;
   const horasalida = new Date();
 
   try {
@@ -15,26 +15,33 @@ export async function PUT(
       return NextResponse.json({ message: 'ID de visitante es requerido' }, { status: 400 });
     }
 
-    // const client = await pool.connect();
-    // const result = await client.query(
-    //   'UPDATE visitantes SET horasalida = $1, estado = $2 WHERE id = $3 AND horasalida IS NULL RETURNING *',
-    //   [horasalida, 'finalizada', id]
-    // );
-    // client.release();
-
-    // if (result.rowCount === 0) {
-    //   return NextResponse.json({ message: 'Visitante no encontrado o ya tiene hora de salida' }, { status: 404 });
-    // }
-    // return NextResponse.json(result.rows[0]);
-
-    // Placeholder response
-    console.log(`Marcando salida para visitante ${id} a las ${horasalida.toISOString()}`);
-    return NextResponse.json({ 
-        message: `Salida marcada para visitante ${id}`, 
-        id, 
-        horasalida: horasalida.toISOString(), 
-        estado: 'finalizada' 
+    const visitanteActualizado = await prisma.visitante.updateMany({
+      where: {
+        id: id,
+        horasalida: null, // Solo actualizar si no tiene ya hora de salida
+      },
+      data: {
+        horasalida: horasalida,
+        estado: 'finalizada',
+      },
     });
+
+    if (visitanteActualizado.count === 0) {
+      // Intentar encontrar el visitante para ver por qué no se actualizó
+      const visitante = await prisma.visitante.findUnique({ where: { id } });
+      if (!visitante) {
+        return NextResponse.json({ message: 'Visitante no encontrado' }, { status: 404 });
+      }
+      if (visitante.horasalida) {
+        return NextResponse.json({ message: 'El visitante ya tiene registrada una hora de salida' }, { status: 409 });
+      }
+      // Otro caso
+      return NextResponse.json({ message: 'No se pudo marcar la salida del visitante' }, { status: 400 });
+    }
+    
+    // Obtener el visitante actualizado para devolverlo (opcional, pero útil)
+    const visitanteConSalida = await prisma.visitante.findUnique({ where: { id } });
+    return NextResponse.json(visitanteConSalida);
 
   } catch (error) {
     console.error(`API Error PUT /api/visitantes/${id}/exit:`, error);

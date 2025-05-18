@@ -1,0 +1,80 @@
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"] // Required for some environments like Vercel Edge
+}
+
+model Sede {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  address   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empleados Empleado[]
+}
+
+model Empleado {
+  id             String   @id @default(cuid())
+  identificacion String   @unique
+  nombreApellido String
+  cargo          String
+  sedeId         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  // Si los empleados pueden ser usuarios de la plataforma:
+  // platformUser PlatformUser? 
+}
+
+// Ejemplo de cómo podría ser un modelo de Usuario de Plataforma
+// model PlatformUser {
+//   id           String  @id @default(cuid())
+//   empleadoId   String  @unique
+//   role         String  // "Admin Principal", "Administrador", "Estándar"
+//   passwordHash String  // Almacenar el hash de la contraseña, no la contraseña en texto plano
+//   canManageAutoregister Boolean @default(false)
+//   isActive     Boolean @default(true)
+//   createdAt    DateTime @default(now())
+//   updatedAt    DateTime @updatedAt
+//
+//   empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+// }
+
+
+model Visitante {
+  id                            String    @id @default(cuid())
+  tipodocumento                 String
+  numerodocumento               String
+  nombres                       String
+  apellidos                     String
+  genero                        String
+  fechanacimiento               DateTime
+  rh                            String
+  telefono                      String
+  personavisitada               String // Nombre de la persona visitada (podría ser ID de empleado si se relaciona)
+  purpose                       String
+  category                      String?
+  tipovisita                    String
+  empresaProviene               String?
+  numerocarnet                  String?
+  vehiculoPlaca                 String?
+  arl                           String
+  eps                           String
+  contactoemergencianombre      String
+  contactoemergenciaapellido    String
+  contactoemergenciatelefono    String
+  contactoemergenciaparentesco  String
+  photoDataUri                  String?   @db.Text // Para strings largos como Data URIs
+  horaentrada                   DateTime  @default(now())
+  horasalida                    DateTime?
+  estado                        String    // e.g., "activa", "finalizada"
+  createdAt                     DateTime  @default(now())
+  updatedAt                     DateTime  @updatedAt
+}
