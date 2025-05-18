@@ -41,6 +41,7 @@ interface VisitorRegistrationFormFieldsProps {
   onAddEps: (newOption: string) => void;
   employeeComboboxOptions: { value: string; label: string }[];
   isSubmitting?: boolean;
+  showScannerSection?: boolean; // Nueva prop
 }
 
 export default function VisitorRegistrationFormFields({
@@ -60,6 +61,7 @@ export default function VisitorRegistrationFormFields({
   epsOptions,
   onAddEps,
   employeeComboboxOptions,
+  showScannerSection = true, // Valor por defecto
 }: VisitorRegistrationFormFieldsProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -72,6 +74,15 @@ export default function VisitorRegistrationFormFields({
   
   const [rawScannedDataInput, setRawScannedDataInput] = useState("");
   const [isProcessingScan, setIsProcessingScan] = useState(false);
+
+  useEffect(() => {
+    // Actualizar la vista previa si el valor del formulario cambia externamente
+    const currentFormPhoto = form.getValues('photoDataUri');
+    if (currentFormPhoto !== capturedPhotoDataUri) {
+      setCapturedPhotoDataUri(currentFormPhoto || null);
+    }
+  }, [form.watch('photoDataUri')]);
+
 
   useEffect(() => {
     const stopCameraTracks = () => {
@@ -154,9 +165,6 @@ export default function VisitorRegistrationFormFields({
     toast({ title: "Procesando datos...", description: "Simulando lectura de cédula con lector físico." });
 
     setTimeout(() => {
-      // Ejemplo de una cadena muy simplificada que el lector físico podría "escribir".
-      // En la realidad, esta cadena es larga y compleja (formato PDF417).
-      // Para la simulación, usaremos un identificador simple.
       const MOCK_PDF417_SIMPLIFIED_TRIGGER = "SCAN_LUISA_GOMEZ"; 
 
       if (rawScannedDataInput.trim() === MOCK_PDF417_SIMPLIFIED_TRIGGER) {
@@ -165,7 +173,7 @@ export default function VisitorRegistrationFormFields({
           nombres: 'Luisa Fernanda',
           apellidos: 'Gómez Arias',
           genero: 'Femenino',
-          fechanacimiento: new Date(1995, 3, 22), // April 22, 1995
+          fechanacimiento: new Date(1995, 3, 22), 
           rh: 'A+',
         };
 
@@ -189,7 +197,6 @@ export default function VisitorRegistrationFormFields({
           form.setValue('rh', mockCedulaData.rh, { shouldValidate: true });
         }
         
-        // Sugerir un tipo de documento si aún no está seleccionado
         if (!form.getValues('tipodocumento')) {
             if (tipoDocumentoOptions.includes("CC")) {
                  form.setValue('tipodocumento', "CC", { shouldValidate: true });
@@ -211,8 +218,11 @@ export default function VisitorRegistrationFormFields({
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
         <Card>
-          <CardHeader><CardTitle className="text-lg">Identificación Visual y por Lector</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <CardHeader><CardTitle className="text-lg">{showScannerSection ? "Identificación Visual y por Lector" : "Identificación Visual"}</CardTitle></CardHeader>
+          <CardContent className={cn(
+            "grid gap-6 items-start",
+            showScannerSection ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+          )}>
             {/* Columna de Fotografía */}
             <div className="space-y-3">
               <FormLabel>Fotografía del Visitante</FormLabel>
@@ -265,33 +275,35 @@ export default function VisitorRegistrationFormFields({
               />
             </div>
 
-            {/* Columna de Escaneo con Lector Físico */}
-            <div className="space-y-4">
-              <FormLabel htmlFor="rawScannedData">Datos de Cédula (Lector Físico)</FormLabel>
-              <Input
-                id="rawScannedData"
-                placeholder="Esperando datos del lector..."
-                value={rawScannedDataInput}
-                onChange={(e) => setRawScannedDataInput(e.target.value)}
-                aria-describedby="scan-helper-text"
-              />
-              <FormDescription id="scan-helper-text">
-                Use su lector de códigos de barras físico para escanear la cédula. Los datos aparecerán aquí.
-                Para simulación, ingrese: <code className="bg-muted p-1 rounded">SCAN_LUISA_GOMEZ</code>
-              </FormDescription>
-              <Button type="button" onClick={handleProcessScannedData} disabled={isProcessingScan || !rawScannedDataInput} className="w-full">
-                {isProcessingScan ? <Loader2 className="mr-2 animate-spin" /> : <ScanLine className="mr-2" />}
-                Procesar Datos Escaneados
-              </Button>
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>Información Importante</AlertTitle>
-                <AlertDescription>
-                  Esta función simula el autocompletado a partir de datos que un lector físico de códigos de barras (PDF417) ingresaría en el campo de arriba.
-                  La decodificación real del formato PDF417 no está implementada en este prototipo.
-                </AlertDescription>
-              </Alert>
-            </div>
+            {/* Columna de Escaneo con Lector Físico (Condicional) */}
+            {showScannerSection && (
+              <div className="space-y-4">
+                <FormLabel htmlFor="rawScannedData">Datos de Cédula (Lector Físico)</FormLabel>
+                <Input
+                  id="rawScannedData"
+                  placeholder="Esperando datos del lector..."
+                  value={rawScannedDataInput}
+                  onChange={(e) => setRawScannedDataInput(e.target.value)}
+                  aria-describedby="scan-helper-text"
+                />
+                <FormDescription id="scan-helper-text">
+                  Use su lector de códigos de barras físico para escanear la cédula. Los datos aparecerán aquí.
+                  Para simulación, ingrese: <code className="bg-muted p-1 rounded">SCAN_LUISA_GOMEZ</code>
+                </FormDescription>
+                <Button type="button" onClick={handleProcessScannedData} disabled={isProcessingScan || !rawScannedDataInput} className="w-full">
+                  {isProcessingScan ? <Loader2 className="mr-2 animate-spin" /> : <ScanLine className="mr-2" />}
+                  Procesar Datos Escaneados
+                </Button>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Información Importante</AlertTitle>
+                  <AlertDescription>
+                    Esta función simula el autocompletado a partir de datos que un lector físico de códigos de barras (PDF417) ingresaría en el campo de arriba.
+                    La decodificación real del formato PDF417 no está implementada en este prototipo.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -392,7 +404,7 @@ export default function VisitorRegistrationFormFields({
                           disabled={field.disabled}
                         >
                           {field.value ? (
-                            format(field.value, "PPP", { locale: es })
+                            format(new Date(field.value), "PPP", { locale: es }) // Asegurarse que field.value es Date
                           ) : (
                             <span>Seleccione una fecha</span>
                           )}

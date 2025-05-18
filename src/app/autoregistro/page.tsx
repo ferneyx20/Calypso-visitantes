@@ -14,13 +14,13 @@ import {
   ARL_OPTIONS,
   EPS_OPTIONS,
   toWritableArray,
-} from "@/app/(app)/admin-dashboard/visitors/schemas"; // Ajustar ruta si es necesario
+} from "@/app/(app)/admin-dashboard/visitors/schemas"; 
 
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ScanFace, Building } from "lucide-react";
-import VisitorRegistrationFormFields from "@/components/visitor/visitor-registration-form-fields"; // Ajustar ruta si es necesario
+import VisitorRegistrationFormFields from "@/components/visitor/visitor-registration-form-fields"; 
 import Image from "next/image";
 
 // Simulación de empleados
@@ -78,6 +78,7 @@ export default function AutoregistroPage() {
       empresaProviene: "",
       numerocarnet: "",
       vehiculoPlaca: "",
+      photoDataUri: "", // Asegurarse de que photoDataUri esté en defaultValues
     },
   });
 
@@ -91,8 +92,6 @@ export default function AutoregistroPage() {
     }
     setIsCategorizing(true);
     try {
-      // En una app real, este endpoint podría ser diferente o no existir para el autoregistro
-      // o podría tener una lógica diferente.
       const response = await fetch("/api/categorize-visit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,18 +126,37 @@ export default function AutoregistroPage() {
   const onSubmit: SubmitHandler<VisitorFormData> = async (data) => {
     setIsSubmitting(true);
     console.log("Autoregistro Data:", data);
-    // Simular envío de datos a un endpoint específico de autoregistro
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Simular envío a API
+    try {
+        // const response = await fetch('/api/visitantes', { // Asumiendo que el endpoint de visitantes sirve para autoregistro
+        //     method: 'POST',
+        //     headers: {'Content-Type': 'application/json'},
+        //     body: JSON.stringify(data)
+        // });
+        // if (!response.ok) {
+        //     const errorData = await response.json();
+        //     throw new Error(errorData.message || "Error al enviar el registro.");
+        // }
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulación de API
 
-    toast({
-      title: "Autoregistro Enviado",
-      description: "Su información ha sido enviada. Por favor, espere confirmación en recepción.",
-      duration: 5000,
-    });
-    setIsSubmitting(false);
-    form.reset();
-    setSuggestedCategory(null);
-    // Aquí podría haber una redirección a una página de "Gracias" o "Instrucciones"
+        toast({
+            title: "Autoregistro Enviado",
+            description: "Su información ha sido enviada. Por favor, espere confirmación en recepción.",
+            duration: 5000,
+        });
+        form.reset();
+        setSuggestedCategory(null);
+    } catch (error) {
+        console.error("Error en autoregistro:", error);
+        toast({
+            variant: "destructive",
+            title: "Error en el Registro",
+            description: (error as Error).message || "No se pudo completar su registro. Intente de nuevo.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const handleAddOptionToList = (
@@ -191,6 +209,7 @@ export default function AutoregistroPage() {
               epsOptions={epsOptions}
               onAddEps={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
               employeeComboboxOptions={employeeComboboxOptions}
+              showScannerSection={false} // Ocultar la sección del lector físico
             />
             <div className="mt-8">
               <Button type="submit" className="w-full" disabled={isSubmitting || isCategorizing}>
@@ -208,8 +227,9 @@ export default function AutoregistroPage() {
         </Form>
       </main>
       <footer className="mt-8 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} Empresa XYZ. Todos los derechos reservados.</p>
+        <p>&copy; {new Date().getFullYear()} Calypso del Caribe. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
 }
+

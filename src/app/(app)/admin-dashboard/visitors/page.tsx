@@ -65,10 +65,8 @@ export default function VisitorsPage() {
   const [visitorEntries, setVisitorEntries] = useState<VisitorEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // Simulación del permiso del usuario actual para gestionar el autoregistro
-  // En una app real, esto vendría del estado del usuario autenticado.
   const [currentUserCanManageAutoregister, setCurrentUserCanManageAutoregister] = useState(true); 
-  const [autoregisterEnabled, setAutoregisterEnabled] = useState(true); // Estado de si la función de autoregistro está activa
+  const [autoregisterEnabled, setAutoregisterEnabled] = useState(true); 
   const [autoregisterUrl, setAutoregisterUrl] = useState("");
 
   const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
@@ -80,8 +78,8 @@ export default function VisitorsPage() {
   
   const employeeComboboxOptions = useMemo(() => 
     SIMULATED_EMPLOYEES.map(emp => ({
-      value: emp.id, // Use a unique ID for value
-      label: `${emp.name} (ID: ${emp.identification})`, // Display name and ID
+      value: emp.id, 
+      label: `${emp.name} (ID: ${emp.identification})`, 
     })), 
   []);
 
@@ -100,6 +98,7 @@ export default function VisitorsPage() {
       empresaProviene: "",
       numerocarnet: "",
       vehiculoPlaca: "",
+      photoDataUri: "", // Asegurar que photoDataUri esté en defaultValues
     },
   });
 
@@ -152,15 +151,16 @@ export default function VisitorsPage() {
 
   const onSubmit: SubmitHandler<VisitorFormData> = async (data) => {
     setIsSubmitting(true);
-    // Find the employee label based on the ID stored in personavisitada
-    const selectedEmployeeOption = employeeComboboxOptions.find(opt => opt.value === data.personavisitada);
-    const personavisitadaLabel = selectedEmployeeOption ? selectedEmployeeOption.label : data.personavisitada;
+    
+    const selectedEmployeeOption = employeeComboboxOptions.find(opt => opt.label === data.personavisitada); // Busca por label
+    const personavisitadaForEntry = selectedEmployeeOption ? selectedEmployeeOption.label : data.personavisitada;
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulación API
 
     const newEntry: VisitorEntry = {
       ...data,
-      personavisitada: personavisitadaLabel, // Store the label for display
+      personavisitada: personavisitadaForEntry, 
       id: `visit-${Date.now()}`,
       horaentrada: new Date(),
       horasalida: null,
@@ -263,6 +263,7 @@ export default function VisitorsPage() {
                     epsOptions={epsOptions}
                     onAddEps={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
                     employeeComboboxOptions={employeeComboboxOptions}
+                    showScannerSection={true} // Para el admin, mostrar la sección de scanner
                   />
                   <DialogFooter className="pt-6 pr-2">
                     <DialogClose asChild>
@@ -294,7 +295,7 @@ export default function VisitorsPage() {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="flex items-center justify-center">
-                    {autoregisterUrl && autoregisterEnabled ? ( // Only show QR if URL exists and autoregister is enabled
+                    {autoregisterUrl && autoregisterEnabled ? ( 
                       <QRCode value={autoregisterUrl} size={192} level="H" />
                     ) : (
                       <div className="h-48 w-48 flex flex-col items-center justify-center bg-muted rounded-md text-center p-4">
@@ -399,7 +400,7 @@ export default function VisitorsPage() {
                       <TableCell className="font-medium">{`${visitor.nombres} ${visitor.apellidos}`}</TableCell>
                       <TableCell>{visitor.tipodocumento}</TableCell>
                       <TableCell>{visitor.numerodocumento}</TableCell>
-                      <TableCell>{visitor.personavisitada}</TableCell> {/* Displaying the stored label */}
+                      <TableCell>{visitor.personavisitada}</TableCell> 
                       <TableCell>{format(new Date(visitor.horaentrada), "Pp", { locale: es })}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" onClick={() => handleMarkExit(visitor.id)}>
@@ -418,5 +419,3 @@ export default function VisitorsPage() {
   );
 }
 
-
-    
