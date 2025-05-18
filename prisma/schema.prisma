@@ -1,80 +1,109 @@
 
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"] // Required for some environments like Vercel Edge
-}
-
 model Sede {
-  id        String   @id @default(cuid())
-  name      String   @unique
+  id        String     @id @default(cuid())
+  name      String     @unique
   address   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   empleados Empleado[]
 }
 
 model Empleado {
-  id             String   @id @default(cuid())
-  identificacion String   @unique
-  nombreApellido String
-  cargo          String
-  sedeId         String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String             @id @default(cuid())
+  identificacion   String             @unique
+  nombreApellido   String
+  cargo            String
+  sedeId           String
+  sede             Sede               @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  usuarioPlataforma UsuarioPlataforma?
+  visitasComoAnfitrion Visitante[]     @relation("VisitanteToAnfitrion")
 
-  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Cascade)
-  // Si los empleados pueden ser usuarios de la plataforma:
-  // platformUser PlatformUser? 
+  @@index([sedeId])
 }
 
-// Ejemplo de cómo podría ser un modelo de Usuario de Plataforma
-// model PlatformUser {
-//   id           String  @id @default(cuid())
-//   empleadoId   String  @unique
-//   role         String  // "Admin Principal", "Administrador", "Estándar"
-//   passwordHash String  // Almacenar el hash de la contraseña, no la contraseña en texto plano
-//   canManageAutoregister Boolean @default(false)
-//   isActive     Boolean @default(true)
-//   createdAt    DateTime @default(now())
-//   updatedAt    DateTime @updatedAt
-//
-//   empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-// }
+enum RolUsuarioPlataforma {
+  AdminPrincipal
+  Administrador
+  Estandar
+}
 
+model UsuarioPlataforma {
+  id                      String                 @id @default(cuid())
+  empleadoId              String                 @unique // Un empleado solo puede ser un usuario de plataforma
+  empleado                Empleado               @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  rol                     RolUsuarioPlataforma
+  // passwordHash         String // IMPORTANTE: Almacenar hash de contraseña, no la contraseña en texto plano
+  canManageAutoregister   Boolean                @default(false)
+  isActive                Boolean                @default(true)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  visitasRegistradasPor Visitante[]            @relation("VisitanteToRegistrador")
+
+
+  @@index([empleadoId])
+}
+
+enum EstadoVisita {
+  activa
+  finalizada
+  cancelada // Podría ser útil en el futuro
+}
 
 model Visitante {
-  id                            String    @id @default(cuid())
-  tipodocumento                 String
-  numerodocumento               String
-  nombres                       String
-  apellidos                     String
-  genero                        String
-  fechanacimiento               DateTime
-  rh                            String
-  telefono                      String
-  personavisitada               String // Nombre de la persona visitada (podría ser ID de empleado si se relaciona)
-  purpose                       String
-  category                      String?
-  tipovisita                    String
-  empresaProviene               String?
-  numerocarnet                  String?
-  vehiculoPlaca                 String?
-  arl                           String
-  eps                           String
-  contactoemergencianombre      String
-  contactoemergenciaapellido    String
-  contactoemergenciatelefono    String
-  contactoemergenciaparentesco  String
-  photoDataUri                  String?   @db.Text // Para strings largos como Data URIs
-  horaentrada                   DateTime  @default(now())
-  horasalida                    DateTime?
-  estado                        String    // e.g., "activa", "finalizada"
-  createdAt                     DateTime  @default(now())
-  updatedAt                     DateTime  @updatedAt
+  id                           String    @id @default(cuid())
+  // Información del visitante
+  tipodocumento                String
+  numerodocumento              String
+  nombres                      String
+  apellidos                    String
+  genero                       String
+  fechanacimiento              DateTime
+  rh                           String
+  telefono                     String
+  photoDataUri                 String?   @db.Text // Para Data URIs largos
+  // Detalles de la visita
+  personavisitadaId            String?   // ID del Empleado visitado
+  personavisitada              Empleado? @relation("VisitanteToAnfitrion", fields: [personavisitadaId], references: [id], onDelete: SetNull)
+  purpose                      String
+  category                     String?
+  tipovisita                   String
+  // Información adicional (opcional)
+  empresaProviene              String?
+  numerocarnet                 String?
+  vehiculoPlaca                String?
+  // Salud y Seguridad
+  arl                          String
+  eps                          String
+  // Contacto de Emergencia
+  contactoemergencianombre     String
+  contactoemergenciaapellido   String
+  contactoemergenciatelefono   String
+  contactoemergenciaparentesco String
+  // Metadata de la visita
+  horaentrada                  DateTime      @default(now())
+  horasalida                   DateTime?
+  estado                       EstadoVisita  @default(activa)
+  registradoPorId              String?       // ID del UsuarioPlataforma que registró
+  registradoPor                UsuarioPlataforma? @relation("VisitanteToRegistrador", fields: [registradoPorId], references: [id], onDelete: SetNull)
+  createdAt                    DateTime      @default(now())
+  updatedAt                    DateTime      @updatedAt
+
+  @@index([numerodocumento])
+  @@index([personavisitadaId])
+  @@index([registradoPorId])
+  @@index([estado])
 }

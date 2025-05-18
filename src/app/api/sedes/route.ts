@@ -1,9 +1,10 @@
+
 // src/app/api/sedes/route.ts
 import { type NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Importar Prisma Client
+import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
-const sedeSchema = z.object({
+const sedeCreateSchema = z.object({
   name: z.string().min(3, { message: "El nombre de la sede debe tener al menos 3 caracteres." }),
   address: z.string().min(5, { message: "La dirección debe tener al menos 5 caracteres." }),
 });
@@ -25,9 +26,10 @@ export async function GET(request: NextRequest) {
 
 // POST /api/sedes - Crear una nueva sede
 export async function POST(request: NextRequest) {
+  let body;
   try {
-    const body = await request.json();
-    const validatedData = sedeSchema.parse(body);
+    body = await request.json();
+    const validatedData = sedeCreateSchema.parse(body);
 
     const nuevaSede = await prisma.sede.create({
       data: {
@@ -42,9 +44,12 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: 'Datos de entrada inválidos', errors: error.errors }, { status: 400 });
     }
-    // Manejo de errores específicos de Prisma (ej. violación de unicidad)
-    if (error instanceof Error && 'code' in error && (error as any).code === 'P2002') { // Prisma unique constraint violation
-        return NextResponse.json({ message: `La sede con nombre '${(error as any).meta?.target?.includes('name') ? body.name : 'desconocido'}' ya existe.` }, { status: 409 });
+    if (error instanceof Error && 'code' in error && (error as any).code === 'P2002') {
+        const target = (error as any).meta?.target as string[];
+        if (target && target.includes('name')) {
+            return NextResponse.json({ message: `La sede con nombre '${body?.name}' ya existe.` }, { status: 409 });
+        }
+        return NextResponse.json({ message: 'Error de unicidad al crear la sede.' }, { status: 409 });
     }
     return NextResponse.json({ message: 'Error al crear la sede', error: (error as Error).message }, { status: 500 });
   }

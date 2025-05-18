@@ -1,29 +1,31 @@
+
 // src/app/api/empleados/route.ts
 import { type NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Importar Prisma Client
+import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
-const empleadoSchema = z.object({
+const empleadoCreateSchema = z.object({
   identificacion: z.string().min(5, { message: "La identificación debe tener al menos 5 caracteres." }),
   nombreApellido: z.string().min(3, { message: "El nombre y apellido debe tener al menos 3 caracteres." }),
   cargo: z.string().min(3, { message: "El cargo debe tener al menos 3 caracteres." }),
-  sedeId: z.string().cuid({ message: "ID de sede inválido." }), // Asumimos que el frontend enviará el ID de la sede
+  sedeId: z.string().cuid({ message: "ID de sede inválido." }),
 });
 
 // GET /api/empleados - Obtener todos los empleados
 export async function GET(request: NextRequest) {
+  // TODO: Implementar filtros por query params si es necesario (ej. /api/empleados?sedeId=xxx&search=nombre)
   try {
     const empleados = await prisma.empleado.findMany({
       orderBy: {
         nombreApellido: 'asc',
       },
-      include: { // Opcional: incluir datos de la sede relacionada
+      include: {
         sede: {
           select: {
             name: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
     return NextResponse.json(empleados);
   } catch (error) {
@@ -37,7 +39,7 @@ export async function POST(request: NextRequest) {
   let body;
   try {
     body = await request.json();
-    const validatedData = empleadoSchema.parse(body);
+    const validatedData = empleadoCreateSchema.parse(body);
 
     // Verificar que la sede exista
     const sedeExistente = await prisma.sede.findUnique({
@@ -54,6 +56,9 @@ export async function POST(request: NextRequest) {
         cargo: validatedData.cargo,
         sedeId: validatedData.sedeId,
       },
+      include: { // Incluir la sede en la respuesta
+        sede: { select: { name: true } }
+      }
     });
     return NextResponse.json(nuevoEmpleado, { status: 201 });
 
@@ -62,9 +67,8 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: 'Datos de entrada inválidos', errors: error.errors }, { status: 400 });
     }
-     // Manejo de errores específicos de Prisma (ej. violación de unicidad para 'identificacion')
     if (error instanceof Error && 'code' in error && (error as any).code === 'P2002') {
-        const target = (error as any).meta?.target;
+        const target = (error as any).meta?.target as string[];
         if (target && target.includes('identificacion')) {
             return NextResponse.json({ message: `El empleado con identificación '${body?.identificacion}' ya existe.` }, { status: 409 });
         }
