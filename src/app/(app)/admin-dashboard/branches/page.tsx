@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,12 +11,24 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Building2, Plus, Loader2 } from "lucide-react";
+import { Building2, Plus, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const branchSchema = z.object({
-  id: z.string().optional(), // Para identificar en la lista
+  id: z.string().optional(),
   name: z.string().min(3, { message: "El nombre de la sede debe tener al menos 3 caracteres." }),
   address: z.string().min(5, { message: "La dirección debe tener al menos 5 caracteres." }),
 });
@@ -24,36 +36,103 @@ const branchSchema = z.object({
 type BranchFormData = z.infer<typeof branchSchema>;
 
 export default function BranchesPage() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [branchesList, setBranchesList] = useState<BranchFormData[]>([]);
+  const [editingBranch, setEditingBranch] = useState<BranchFormData | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<BranchFormData | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+
   const { toast } = useToast();
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<BranchFormData>({
     resolver: zodResolver(branchSchema),
   });
 
+  const handleOpenFormDialog = (branch?: BranchFormData) => {
+    if (branch) {
+      setEditingBranch(branch);
+      setValue("name", branch.name);
+      setValue("address", branch.address);
+      setValue("id", branch.id);
+    } else {
+      setEditingBranch(null);
+      reset({ name: "", address: "", id: undefined });
+    }
+    setIsFormDialogOpen(true);
+  };
+
   const onSubmit: SubmitHandler<BranchFormData> = async (data) => {
     setIsSubmitting(true);
-    // Simular llamada a API
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
 
-    const newBranch = { ...data, id: `branch-${Date.now()}` };
-    setBranchesList(prev => [...prev, newBranch]);
+    if (editingBranch) {
+      // Update existing branch
+      setBranchesList(prev => prev.map(b => b.id === editingBranch.id ? { ...b, ...data } : b));
+      toast({
+        title: "Sede Actualizada",
+        description: `La sede "${data.name}" ha sido actualizada.`,
+      });
+    } else {
+      // Add new branch
+      const newBranch = { ...data, id: `branch-${Date.now()}` };
+      setBranchesList(prev => [...prev, newBranch]);
+      toast({
+        title: "Sede Agregada",
+        description: `La sede "${data.name}" ha sido agregada.`,
+      });
+    }
 
-    toast({
-      title: "Sede Agregada",
-      description: `La sede "${data.name}" ha sido agregada exitosamente.`,
-    });
     setIsSubmitting(false);
-    setIsDialogOpen(false);
-    reset();
+    setIsFormDialogOpen(false);
+    setEditingBranch(null);
+    reset({ name: "", address: "", id: undefined });
   };
+
+  const handleDeleteClick = (branch: BranchFormData) => {
+    setBranchToDelete(branch);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (branchToDelete) {
+      setBranchesList(prev => prev.filter(b => b.id !== branchToDelete.id));
+      toast({
+        title: "Sede Eliminada",
+        description: `La sede "${branchToDelete.name}" ha sido eliminada.`,
+        variant: "destructive"
+      });
+      setBranchToDelete(null);
+    }
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleSelectAll = (checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedBranchIds(branchesList.map(b => b.id!));
+    } else {
+      setSelectedBranchIds([]);
+    }
+  };
+
+  const handleRowSelect = (branchId: string, checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedBranchIds(prev => [...prev, branchId]);
+    } else {
+      setSelectedBranchIds(prev => prev.filter(id => id !== branchId));
+    }
+  };
+  
+  const isAllSelected = branchesList.length > 0 && selectedBranchIds.length === branchesList.length;
+  const isSomeSelected = selectedBranchIds.length > 0 && selectedBranchIds.length < branchesList.length;
+
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
@@ -62,16 +141,20 @@ export default function BranchesPage() {
           <Building2 className="mr-3 h-8 w-8 text-primary" />
           Gestión de Sedes
         </h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isFormDialogOpen} onOpenChange={(isOpen) => {
+            setIsFormDialogOpen(isOpen);
+            if (!isOpen) {
+              setEditingBranch(null);
+              reset({ name: "", address: "", id: undefined });
+            }
+          }}>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Agregar Sede
-                  </Button>
-                </DialogTrigger>
+                <Button variant="outline" onClick={() => handleOpenFormDialog()}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Sede
+                </Button>
               </TooltipTrigger>
               <TooltipContent>
                 <p>Agregar Nueva Sede</p>
@@ -80,9 +163,9 @@ export default function BranchesPage() {
           </TooltipProvider>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Agregar Nueva Sede</DialogTitle>
+              <DialogTitle>{editingBranch ? "Editar Sede" : "Agregar Nueva Sede"}</DialogTitle>
               <DialogDescription>
-                Complete los detalles de la nueva sede a continuación.
+                {editingBranch ? "Modifique los detalles de la sede." : "Complete los detalles de la nueva sede."}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -114,10 +197,10 @@ export default function BranchesPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Guardando...
+                      {editingBranch ? "Actualizando..." : "Guardando..."}
                     </>
                   ) : (
-                    "Guardar Sede"
+                    editingBranch ? "Actualizar Sede" : "Guardar Sede"
                   )}
                 </Button>
               </DialogFooter>
@@ -126,11 +209,47 @@ export default function BranchesPage() {
         </Dialog>
       </div>
 
+      {selectedBranchIds.length > 0 && (
+        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md border">
+            <span className="text-sm text-muted-foreground">{selectedBranchIds.length} sede(s) seleccionada(s)</span>
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                        <Trash2 className="mr-2 h-4 w-4"/>
+                        Eliminar Seleccionadas
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Esta acción eliminará permanentemente {selectedBranchIds.length} sede(s) seleccionada(s). Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={() => {
+                            setBranchesList(prev => prev.filter(b => !selectedBranchIds.includes(b.id!)));
+                            setSelectedBranchIds([]);
+                            toast({ title: "Sedes Eliminadas", description: `${selectedBranchIds.length} sede(s) han sido eliminadas.`, variant: "destructive"});
+                        }}
+                        className={selectedBranchIds.length > 0 ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+                        disabled={selectedBranchIds.length === 0}
+                    >
+                        Eliminar
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+      )}
+
       <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Listado de Sedes</CardTitle>
           <CardDescription>
-            Aquí podrá ver las sedes creadas.
+            Aquí podrá ver las sedes creadas. Puede editar o eliminar cada sede.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 pt-0 flex flex-col flex-1">
@@ -139,20 +258,50 @@ export default function BranchesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected || (isSomeSelected && 'indeterminate')}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Seleccionar todas las filas"
+                      />
+                    </TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Dirección</TableHead>
-                    {/* <TableHead className="text-right">Acciones</TableHead> */}
+                    <TableHead className="text-right w-[120px]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {branchesList.map((branch) => (
-                    <TableRow key={branch.id}>
+                    <TableRow key={branch.id} data-state={selectedBranchIds.includes(branch.id!) ? "selected" : ""}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedBranchIds.includes(branch.id!)}
+                          onCheckedChange={(checked) => handleRowSelect(branch.id!, checked)}
+                          aria-label={`Seleccionar fila ${branch.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{branch.name}</TableCell>
                       <TableCell>{branch.address}</TableCell>
-                      {/* <TableCell className="text-right">
-                        <Button variant="ghost" size="icon"><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                      </TableCell> */}
+                      <TableCell className="text-right">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenFormDialog(branch)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Editar Sede</p></TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(branch)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Eliminar Sede</p></TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -165,6 +314,25 @@ export default function BranchesPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro de eliminar esta sede?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente la sede "{branchToDelete?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBranchToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+    
