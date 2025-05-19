@@ -37,7 +37,6 @@ export default function AppShell({ children, userRole }: AppShellProps) {
     ? allMenuItems.filter(item => !item.adminOnly).map(item => ({...item, href: item.standardPath || item.href }))
     : allMenuItems;
 
-  // Determinar el prefijo de la ruta base según el rol para la lógica de isActive
   const basePath = userRole === 'Estándar' ? '/standard-dashboard' : '/admin-dashboard';
 
   return (
@@ -51,7 +50,7 @@ export default function AppShell({ children, userRole }: AppShellProps) {
           <SidebarMenu>
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref legacyBehavior>
+                <Link href={item.href} passHref>
                   <SidebarMenuButton
                     isActive={
                       pathname === item.href || 
@@ -71,11 +70,10 @@ export default function AppShell({ children, userRole }: AppShellProps) {
       </Sidebar>
       <SidebarInset className="flex flex-col flex-1 py-4 md:py-6 lg:py-8 px-4 md:px-6 lg:px-8">
         <AppHeader />
-        <main className="flex flex-col flex-1 pt-4"> {/* Añadido pt-4 para separar del header */}
+        <main className="flex flex-col flex-1 pt-4">
           {children}
         </main>
       </SidebarInset>
     </div>
   );
 }
-

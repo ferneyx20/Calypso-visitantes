@@ -1,6 +1,6 @@
 
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Bell, Sun, Moon, UserPlus, UserCheck, FilePenLine, AlarmClockOff, Trash2, LogOut, KeyRound, ImageIcon, Edit3, ShieldQuestion, Building2, UserX, CheckCircle, Info, PackageCheck, PackageX } from "lucide-react";
@@ -29,7 +29,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Loader2 } from "lucide-react";
 import { logoutAction } from "@/app/(auth)/logout/actions";
 
-interface NotificationItem {
+export interface NotificationItem {
   id: string;
   icon: React.ReactNode;
   title: string;
@@ -54,11 +54,10 @@ const timeAgo = (date: Date): string => {
   return `Hace ${Math.floor(seconds)} seg`;
 };
 
-// Simple event emitter for notifications
-type NotificationPayload = Omit<NotificationItem, 'id' | 'timestamp'>;
+export type NotificationPayload = Omit<NotificationItem, 'id' | 'timestamp'>;
 let notificationListeners: Array<(notification: NotificationPayload) => void> = [];
 
-const notify = {
+export const notify = {
   new: (data: NotificationPayload) => {
     notificationListeners.forEach(listener => listener(data));
   },
@@ -69,9 +68,6 @@ const notify = {
     };
   }
 };
-
-// Export for use in other components
-export { notify, type NotificationPayload, type NotificationItem };
 
 
 const changePasswordSchema = z.object({
@@ -84,6 +80,13 @@ const changePasswordSchema = z.object({
 });
 type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 
+interface CurrentUser {
+  name: string;
+  role: string;
+  avatarUrl: string | null;
+  initials: string;
+}
+
 export default function AppHeader() {
   const { toast } = useToast();
   const router = useRouter();
@@ -94,12 +97,14 @@ export default function AppHeader() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
 
-  const currentUser = {
+  const [currentUser, setCurrentUser] = useState<CurrentUser>({
     name: "Admin Usuario", 
     role: "Admin Principal", 
-    avatarUrl: "", 
+    avatarUrl: null, 
     initials: "AU"
-  };
+  });
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
 
   const passwordForm = useForm<ChangePasswordFormData>({
     resolver: zodResolver(changePasswordSchema),
@@ -129,7 +134,6 @@ export default function AppHeader() {
   }, [isDark, isMounted]);
   
   useEffect(() => {
-    // Removed MOCK_NOTIFICATIONS initialization
     const unsubscribe = notify.subscribe((newNotificationData) => {
       setNotifications(prev => [
         {
@@ -138,7 +142,7 @@ export default function AppHeader() {
           timestamp: timeAgo(new Date()),
         },
         ...prev
-      ].slice(0, 20)); // Keep max 20 notifications
+      ].slice(0, 20));
     });
     return () => unsubscribe();
   }, []);
@@ -160,13 +164,27 @@ export default function AppHeader() {
   };
 
   const handleChangePhoto = () => {
-    toast({ title: "Cambiar Foto de Perfil", description: "Esta función aún no está implementada." });
+    photoInputRef.current?.click();
   };
+
+  const handlePhotoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCurrentUser(prev => ({ ...prev, avatarUrl: reader.result as string }));
+        toast({ title: "Foto de Perfil Actualizada (Vista Previa)", description: "La nueva foto se muestra. El guardado real no está implementado." });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   const onSubmitPasswordChange: SubmitHandler<ChangePasswordFormData> = async (data) => {
     setIsSubmittingPassword(true);
     console.log("Password change data:", data); 
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+    // TODO: Implement actual API call to /api/auth/change-password (or similar)
     toast({ title: "Contraseña Cambiada", description: "Tu contraseña ha sido actualizada (simulado)." });
     setIsSubmittingPassword(false);
     setIsChangePasswordOpen(false);
@@ -278,6 +296,13 @@ export default function AppHeader() {
                   <ImageIcon className="mr-2 h-4 w-4" />
                   <span>Cambiar Foto de Perfil</span>
                 </DropdownMenuItem>
+                <input
+                  type="file"
+                  ref={photoInputRef}
+                  onChange={handlePhotoFileChange}
+                  accept="image/*"
+                  className="hidden"
+                />
                 <DropdownMenuItem onClick={() => setIsChangePasswordOpen(true)}>
                   <KeyRound className="mr-2 h-4 w-4" />
                   <span>Cambiar Contraseña</span>

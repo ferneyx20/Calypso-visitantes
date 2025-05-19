@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RolUsuarioPlataforma } from "@prisma/client"; 
-import { notify } from "@/components/layout/app-header"; // Importar el emisor de notificaciones
+import { notify } from "@/components/layout/app-header";
 
 interface SearchableEmployee {
   id: string; 
@@ -109,10 +109,6 @@ export default function UserManagementPage() {
   };
 
   const fetchSearchableEmployees = async (term: string) => {
-    if (!term) {
-      setSearchableEmployees([]);
-      return;
-    }
     setIsLoadingSearchable(true);
     try {
       const response = await fetch(`/api/empleados?search=${encodeURIComponent(term)}`); 
@@ -132,15 +128,12 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     fetchPlatformUsers();
+    fetchSearchableEmployees(""); // Cargar empleados iniciales
   }, []);
   
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      if (searchTermEmployee.trim()) {
-        fetchSearchableEmployees(searchTermEmployee);
-      } else {
-        setSearchableEmployees([]);
-      }
+      fetchSearchableEmployees(searchTermEmployee);
     }, 500);
     return () => clearTimeout(delayDebounceFn);
   }, [searchTermEmployee]);
@@ -150,7 +143,7 @@ export default function UserManagementPage() {
     setSelectedEmployeeForConversion(employee);
     roleForm.reset({
       empleadoId: employee.id,
-      rol: undefined,
+      rol: undefined, 
     });
     setIsRoleDialogOpen(true);
   };
@@ -168,6 +161,8 @@ export default function UserManagementPage() {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Error al crear usuario de plataforma');
       }
+      const newPlatformUser: PlatformUserFromAPI = await response.json();
+      setPlatformUsers(prev => [newPlatformUser, ...prev]);
       toast({
         title: "Usuario Creado",
         description: `${selectedEmployeeForConversion.nombreApellido} ahora es un usuario de la plataforma con rol ${data.rol}.`,
@@ -181,11 +176,10 @@ export default function UserManagementPage() {
         read: false
       });
 
-      fetchPlatformUsers(); 
       setIsRoleDialogOpen(false);
       setSelectedEmployeeForConversion(null);
       setSearchTermEmployee(""); 
-      setSearchableEmployees([]);
+      setSearchableEmployees(prev => prev.filter(emp => emp.id !== data.empleadoId)); // Remover de lista de "convertibles"
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: (error as Error).message });
     } finally {
@@ -197,7 +191,7 @@ export default function UserManagementPage() {
     const user = platformUsers.find(u => u.id === userId);
     if (!user) return;
 
-    const updatePayload: Partial<PlatformUserFromAPI> = { [property]: !currentValue };
+    const updatePayload: Partial<Pick<PlatformUserFromAPI, 'isActive' | 'canManageAutoregister'>> = { [property]: !currentValue };
     
     try {
       const response = await fetch(`/api/usuarios/${userId}`, {
@@ -214,7 +208,7 @@ export default function UserManagementPage() {
       
       let title = "";
       let description = "";
-      let notifIcon = <UserCheckIcon className="h-5 w-5 text-green-500" />;
+      let notifIcon: React.ReactNode = <UserCheckIcon className="h-5 w-5 text-green-500" />;
       let notifType: NotificationPayload['type'] = 'user_updated';
 
       if (property === 'isActive') {
@@ -230,7 +224,8 @@ export default function UserManagementPage() {
 
     } catch (error) {
       toast({ variant: "destructive", title: "Error de Actualización", description: (error as Error).message });
-       fetchPlatformUsers(); 
+       // Opcional: volver a cargar todos los usuarios si la actualización local falla o es compleja
+       // fetchPlatformUsers(); 
     }
   };
 
@@ -347,7 +342,7 @@ export default function UserManagementPage() {
           ) : (
             !isLoadingSearchable && (
                 <p className="text-muted-foreground text-center py-4">
-                {searchTermEmployee ? "No se encontraron empleados." : "Ingrese un término para buscar empleados."}
+                {searchTermEmployee ? "No se encontraron empleados." : "Ingrese un término para buscar empleados o espere la carga inicial."}
                 </p>
             )
           )}

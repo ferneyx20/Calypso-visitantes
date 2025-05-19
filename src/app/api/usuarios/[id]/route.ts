@@ -55,8 +55,9 @@ export async function PUT(
         return NextResponse.json({ message: 'No se proporcionaron datos para actualizar.' }, { status: 400 });
     }
     
-    // Si se actualiza el rol, también se debe actualizar canManageAutoregister
-    let dataToUpdate: any = { ...validatedData };
+    let dataToUpdate: Partial<PlatformUserFromAPI> & { canManageAutoregister?: boolean } = { ...validatedData };
+
+    // Si se está actualizando el rol, ajustar canManageAutoregister en consecuencia
     if (validatedData.rol) {
         dataToUpdate.canManageAutoregister = validatedData.rol === RolUsuarioPlataforma.AdminPrincipal || validatedData.rol === RolUsuarioPlataforma.Administrador;
     }
@@ -108,4 +109,21 @@ export async function DELETE(
     }
     return NextResponse.json({ message: 'Error al eliminar el usuario de plataforma', error: (error as Error).message }, { status: 500 });
   }
+}
+
+// Definición del tipo PlatformUserFromAPI para la respuesta del PUT
+interface PlatformUserFromAPI {
+  id: string; 
+  empleadoId: string;
+  rol: RolUsuarioPlataforma;
+  canManageAutoregister: boolean;
+  isActive: boolean;
+  empleado: { 
+    identificacion: string;
+    nombreApellido: string;
+    cargo: string;
+    sede?: { name: string };
+  };
+  createdAt?: Date;
+  updatedAt?: Date;
 }
