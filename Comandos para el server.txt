@@ -1,0 +1,22 @@
+
+npm install
+npm install prisma
+npx prisma generate
+Remove-Item -Recurse -Force prisma\migrations
+rm -rf prisma/migrations
+npx prisma migrate dev --name init_db
+npm install bcryptjs zod
+npm install jose
+npm install -D ts-node typescript @types/node
+npm install -D @types/bcryptjs
+npm install jsonwebtoken
+npm install -D @types/jsonwebtoken
+npm run dev
+
+
+explico problema.
+
+Indico la estructura de carpetas en archivo txt me indicas que archivos modificar te doy el codigo completo 
+del archivo devuelve archivo con codigo completo modificado archivo por archivo 
+
+explicando brevemente los cambios para no perderme con tanta informacion
