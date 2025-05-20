@@ -1,4 +1,3 @@
-
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -46,7 +45,7 @@ model UsuarioPlataforma {
   empleadoId              String                 @unique // Un empleado solo puede ser un usuario de plataforma
   empleado                Empleado               @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   rol                     RolUsuarioPlataforma
-  // passwordHash         String // IMPORTANTE: Almacenar hash de contraseña, no la contraseña en texto plano
+  passwordHash            String // IMPORTANTE: Almacenar hash de contraseña, no la contraseña en texto plano
   canManageAutoregister   Boolean                @default(false)
   isActive                Boolean                @default(true)
   createdAt               DateTime               @default(now())

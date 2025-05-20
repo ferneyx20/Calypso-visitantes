@@ -33,6 +33,7 @@ CREATE TABLE "UsuarioPlataforma" (
     "id" TEXT NOT NULL,
     "empleadoId" TEXT NOT NULL,
     "rol" "RolUsuarioPlataforma" NOT NULL,
+    "passwordHash" TEXT NOT NULL,
     "canManageAutoregister" BOOLEAN NOT NULL DEFAULT false,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
