@@ -1,70 +1,46 @@
-
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import QRCode from "qrcode.react";
-import {
-  visitorRegistrationSchema,
-  type VisitorFormData,
-  TIPO_DOCUMENTO,
-  GENERO,
-  RH,
-  TIPO_VISITA_OPTIONS,
-  ARL_OPTIONS,
-  EPS_OPTIONS,
-  toWritableArray,
-} from "./schemas";
+import type { FullVisitorFormData } from "@/components/visitor/visitor-registration-form"; 
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
-import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Loader2, LogOut, Users, Link as LinkIcon, QrCode, UserPlus, PackageCheck, PackageX } from "lucide-react";
-import VisitorRegistrationFormFields from "@/components/visitor/visitor-registration-form-fields";
+import { Plus, Search, Loader2, LogOut, Users, Link as LinkIcon, QrCode, UserPlus, UserX } from "lucide-react";
+import VisitorRegistrationForm from "@/components/visitor/visitor-registration-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { notify } from "@/components/layout/app-header"; // Importar el emisor de notificaciones
+import { notify } from "@/components/layout/app-header";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface EmployeeOption {
   value: string; 
   label: string; 
 }
-interface VisitorFromAPI extends VisitorFormData {
+interface VisitorFromAPI {
     id: string;
+    tipodocumento: string;
+    numerodocumento: string;
+    nombres: string;
+    apellidos: string;
+    personavisitada?: { nombreApellido: string }; 
     horaentrada: Date | string; 
     horasalida: Date | string | null;
     estado: "activa" | "finalizada";
-    personavisitada?: { nombreApellido: string }; 
     createdAt?: Date;
     updatedAt?: Date;
 }
-
-const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  const debounced = (...args: Parameters<F>) => {
-    if (timeout !== null) {
-      clearTimeout(timeout);
-      timeout = null;
-    }
-    timeout = setTimeout(() => func(...args), waitFor);
-  };
-  return debounced as (...args: Parameters<F>) => ReturnType<F>;
-};
 
 export default function VisitorsPage() {
   const { toast } = useToast();
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false);
   const [isAutoregisterDialogOpen, setIsAutoregisterDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCategorizing, setIsCategorizing] = useState(false);
-  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
   
   const [visitorEntries, setVisitorEntries] = useState<VisitorFromAPI[]>([]);
   const [isLoadingVisitors, setIsLoadingVisitors] = useState(true);
@@ -73,44 +49,11 @@ export default function VisitorsPage() {
   const [currentUserCanManageAutoregister, setCurrentUserCanManageAutoregister] = useState(true); 
   const [autoregisterEnabled, setAutoregisterEnabled] = useState(true); 
   const [autoregisterUrl, setAutoregisterUrl] = useState("");
-
-  const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
-  const [generoOptions, setGeneroOptions] = useState<string[]>(toWritableArray(GENERO));
-  const [rhOptions, setRhOptions] = useState<string[]>(toWritableArray(RH));
-  const [tipoVisitaOptions, setTipoVisitaOptions] = useState<string[]>(toWritableArray(TIPO_VISITA_OPTIONS));
-  const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
-  const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
   
+  // Estado para las opciones del combobox de empleados
   const [employeeComboboxOptions, setEmployeeComboboxOptions] = useState<EmployeeOption[]>([]);
+  const [isLoadingEmployeesOptions, setIsLoadingEmployeesOptions] = useState(true);
 
-  const form = useForm<VisitorFormData>({
-    resolver: zodResolver(visitorRegistrationSchema),
-    defaultValues: {
-      personavisitada: "", 
-      purpose: "",
-      category: "",
-      tipodocumento: undefined,
-      numerodocumento: "",
-      nombres: "",
-      apellidos: "",
-      genero: undefined,
-      rh: undefined,
-      tipovisita: undefined,
-      arl: undefined,
-      eps: undefined,
-      empresaProviene: "",
-      numerocarnet: "",
-      vehiculoPlaca: "",
-      photoDataUri: "",
-      telefono: "",
-      contactoemergencianombre: "",
-      contactoemergenciaapellido: "",
-      contactoemergenciatelefono: "",
-      contactoemergenciaparentesco: "",
-    },
-  });
-
-  const purposeValue = form.watch("purpose");
 
   const fetchActiveVisitors = async () => {
     setIsLoadingVisitors(true);
@@ -133,116 +76,38 @@ export default function VisitorsPage() {
   };
 
   const fetchEmployeesForCombobox = async () => {
+    setIsLoadingEmployeesOptions(true);
     try {
-      const response = await fetch('/api/empleados');
-      if (!response.ok) throw new Error('Error al cargar empleados');
+      const response = await fetch('/api/empleados?activo=true'); // Solo empleados activos
+      if (!response.ok) throw new Error('Error al cargar empleados anfitriones');
       const employees: {id: string, nombreApellido: string, identificacion: string}[] = await response.json();
       setEmployeeComboboxOptions(
         employees.map(emp => ({
-          value: emp.id,
+          value: emp.id, // El ID del empleado
           label: `${emp.nombreApellido} (ID: ${emp.identificacion})`,
         }))
       );
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los empleados para el selector." });
+      toast({ variant: "destructive", title: "Error de Carga", description: "No se pudieron cargar los empleados para el selector." });
+      setEmployeeComboboxOptions([]); // Asegurar que sea un array vacío en caso de error
+    } finally {
+      setIsLoadingEmployeesOptions(false);
     }
   };
 
   useEffect(() => {
     fetchActiveVisitors();
-    fetchEmployeesForCombobox();
+    fetchEmployeesForCombobox(); // Cargar empleados cuando el componente monta
     if (typeof window !== 'undefined') {
       setAutoregisterUrl(`${window.location.origin}/autoregistro`);
     }
   }, []);
 
-  const fetchCategorySuggestion = useCallback(async (purposeText: string) => {
-    if (purposeText.trim().length < 10) {
-      setSuggestedCategory(null);
-      form.setValue("category", "");
-      return;
-    }
-    setIsCategorizing(true);
-    try {
-      const response = await fetch("/api/categorize-visit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose: purposeText }),
-      });
-      if (!response.ok) throw new Error("Error al obtener la categoría");
-      const data = await response.json();
-      setSuggestedCategory(data.suggestedCategory);
-      if (data.suggestedCategory) {
-        form.setValue("category", data.suggestedCategory);
-      }
-    } catch (error) {
-      console.error("Error fetching category:", error);
-      setSuggestedCategory(null);
-      form.setValue("category", "");
-    } finally {
-      setIsCategorizing(false);
-    }
-  }, [form]);
 
-  const debouncedFetchCategory = useCallback(debounce(fetchCategorySuggestion, 750), [fetchCategorySuggestion]);
-
-  useEffect(() => {
-    if (purposeValue) {
-      debouncedFetchCategory(purposeValue);
-    } else {
-      setSuggestedCategory(null);
-      form.setValue("category", "");
-    }
-  }, [purposeValue, debouncedFetchCategory, form]);
-
-  const onSubmit: SubmitHandler<VisitorFormData> = async (formData) => {
-    setIsSubmitting(true);
-    
-    const selectedEmployee = employeeComboboxOptions.find(opt => opt.label === formData.personavisitada);
-    const personavisitadaId = selectedEmployee ? selectedEmployee.value : null;
-
-    const apiPayload = {
-      ...formData,
-      fechanacimiento: formData.fechanacimiento.toISOString(), 
-      personavisitadaId: personavisitadaId,
-    };
-    // @ts-ignore
-    delete apiPayload.personavisitada; 
-
-    try {
-      const response = await fetch('/api/visitantes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiPayload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Error al registrar la visita.");
-      }
-      
-      toast({
-        title: "Visita Registrada",
-        description: `${formData.nombres} ${formData.apellidos} ha sido registrado(a).`,
-      });
-      
-      notify.new({
-        icon: <UserPlus className="h-5 w-5 text-blue-500" />,
-        title: "Nuevo Visitante Registrado",
-        description: `${formData.nombres} ${formData.apellidos} ha ingresado.`,
-        type: 'visitor_in',
-        read: false
-      });
-
-      fetchActiveVisitors(); 
-      setIsRegisterDialogOpen(false);
-      form.reset();
-      setSuggestedCategory(null);
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error de Registro", description: (error as Error).message });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleFormSubmitSuccess = (data: FullVisitorFormData) => {
+    console.log("Visita registrada desde VisitorsPage:", data);
+    fetchActiveVisitors(); 
+    setIsRegisterDialogOpen(false);
   };
   
   const handleMarkExit = async (visitorId: string) => {
@@ -261,7 +126,7 @@ export default function VisitorsPage() {
       });
 
       notify.new({
-          icon: <PackageX className="h-5 w-5 text-orange-500" />,
+          icon: <UserX className="h-5 w-5 text-orange-500" />, 
           title: "Salida de Visitante",
           description: `${visitor.nombres} ${visitor.apellidos} ha salido.`,
           type: 'visitor_out',
@@ -289,15 +154,6 @@ export default function VisitorsPage() {
     );
   }, [visitorEntries, searchTerm]);
 
-  const handleAddOptionToList = (
-    optionValue: string,
-    optionsList: string[],
-    setOptionsList: React.Dispatch<React.SetStateAction<string[]>>
-  ) => {
-    if (optionValue && !optionsList.some(opt => opt.toLowerCase() === optionValue.toLowerCase())) {
-      setOptionsList(prev => [...prev, optionValue]);
-    }
-  };
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
@@ -307,58 +163,39 @@ export default function VisitorsPage() {
           Gestión de Visitantes
         </h1>
         <div className="flex gap-2">
-          <Dialog open={isRegisterDialogOpen} onOpenChange={(open) => {
-            setIsRegisterDialogOpen(open);
-            if (!open) {
-              form.reset();
-              setSuggestedCategory(null);
-            }
-          }}>
+          <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
+              <Button variant="outline" disabled={isLoadingEmployeesOptions}>
+                {isLoadingEmployeesOptions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                 Registrar Visita
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-3xl">
+            <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Registrar Nueva Visita</DialogTitle>
-                <DialogDescription>Complete todos los campos para registrar al visitante.</DialogDescription>
+                <DialogDescription>
+                  Complete todos los campos para registrar al visitante.
+                </DialogDescription>
               </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)}>
-                  <VisitorRegistrationFormFields
-                    form={form}
-                    isCategorizing={isCategorizing}
-                    suggestedCategory={suggestedCategory}
-                    tipoDocumentoOptions={tipoDocumentoOptions}
-                    onAddTipoDocumento={(newOption) => handleAddOptionToList(newOption, tipoDocumentoOptions, setTipoDocumentoOptions)}
-                    generoOptions={generoOptions}
-                    onAddGenero={(newOption) => handleAddOptionToList(newOption, generoOptions, setGeneroOptions)}
-                    rhOptions={rhOptions}
-                    onAddRh={(newOption) => handleAddOptionToList(newOption, rhOptions, setRhOptions)}
-                    tipoVisitaOptions={tipoVisitaOptions}
-                    onAddTipoVisita={(newOption) => handleAddOptionToList(newOption, tipoVisitaOptions, setTipoVisitaOptions)}
-                    arlOptions={arlOptions}
-                    onAddArl={(newOption) => handleAddOptionToList(newOption, arlOptions, setArlOptions)}
-                    epsOptions={epsOptions}
-                    onAddEps={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
-                    employeeComboboxOptions={employeeComboboxOptions}
-                    showScannerSection={true}
-                  />
-                  <DialogFooter className="pt-6 pr-2">
-                    <DialogClose asChild>
-                      <Button type="button" variant="outline" disabled={isSubmitting}>Cancelar</Button>
-                    </DialogClose>
-                    <Button type="submit" disabled={isSubmitting || isCategorizing}>
-                      {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</>) : "Guardar Visita"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
+              {/* Renderizar VisitorRegistrationForm aquí y pasarle las props necesarias */}
+              {isRegisterDialogOpen && !isLoadingEmployeesOptions && ( // Solo renderizar si el diálogo está abierto y las opciones cargadas
+                <VisitorRegistrationForm 
+                  isAutoregistro={false} 
+                  onSubmitSuccess={handleFormSubmitSuccess}
+                  employeeComboboxOptions={employeeComboboxOptions} 
+                />
+              )}
+              {isLoadingEmployeesOptions && isRegisterDialogOpen && (
+                <div className="flex-grow flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary"/>
+                    <p className="ml-2">Cargando datos del formulario...</p>
+                </div>
+              )}
+               {/* El DialogFooter ahora está dentro de VisitorRegistrationForm */}
             </DialogContent>
           </Dialog>
 
+          {/* Dialogo de Autoregistro */}
           {currentUserCanManageAutoregister && (
             <Dialog open={isAutoregisterDialogOpen} onOpenChange={setIsAutoregisterDialogOpen}>
               <DialogTrigger asChild>
@@ -380,9 +217,9 @@ export default function VisitorsPage() {
                       <QRCode value={autoregisterUrl} size={192} level="H" />
                     ) : (
                       <div className="h-48 w-48 flex flex-col items-center justify-center bg-muted rounded-md text-center p-4">
-                        { !autoregisterUrl ? <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" /> : null }
+                        { !autoregisterUrl || !autoregisterEnabled && <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />}
                         <p className="text-sm text-muted-foreground">
-                          {autoregisterEnabled ? "Generando QR..." : "El autoregistro está desactivado."}
+                          {autoregisterEnabled ? (autoregisterUrl ? "" : "Generando QR...") : "El autoregistro está desactivado."}
                         </p>
                       </div>
                     )}

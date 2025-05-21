@@ -4,6 +4,9 @@ CREATE TYPE "RolUsuarioPlataforma" AS ENUM ('AdminPrincipal', 'Administrador', '
 -- CreateEnum
 CREATE TYPE "EstadoVisita" AS ENUM ('activa', 'finalizada', 'cancelada');
 
+-- CreateEnum
+CREATE TYPE "ManagedListType" AS ENUM ('TIPOS_DE_DOCUMENTO', 'GENEROS', 'FACTORES_RH', 'TIPOS_DE_VISITA', 'ARLS', 'EPSS', 'PARENTESCOS_CONTACTO_EMERGENCIA');
+
 -- CreateTable
 CREATE TABLE "Sede" (
     "id" TEXT NOT NULL,
@@ -77,6 +80,19 @@ CREATE TABLE "Visitante" (
     CONSTRAINT "Visitante_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "ManagedListItem" (
+    "id" TEXT NOT NULL,
+    "listType" "ManagedListType" NOT NULL,
+    "value" TEXT NOT NULL,
+    "order" INTEGER,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ManagedListItem_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Sede_name_key" ON "Sede"("name");
 
@@ -103,6 +119,15 @@ CREATE INDEX "Visitante_registradoPorId_idx" ON "Visitante"("registradoPorId");
 
 -- CreateIndex
 CREATE INDEX "Visitante_estado_idx" ON "Visitante"("estado");
+
+-- CreateIndex
+CREATE INDEX "ManagedListItem_listType_idx" ON "ManagedListItem"("listType");
+
+-- CreateIndex
+CREATE INDEX "ManagedListItem_listType_order_idx" ON "ManagedListItem"("listType", "order");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ManagedListItem_listType_value_key" ON "ManagedListItem"("listType", "value");
 
 -- AddForeignKey
 ALTER TABLE "Empleado" ADD CONSTRAINT "Empleado_sedeId_fkey" FOREIGN KEY ("sedeId") REFERENCES "Sede"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -1,8 +1,118 @@
-import { PrismaClient, RolUsuarioPlataforma } from '@prisma/client';
+import { PrismaClient, RolUsuarioPlataforma, ManagedListType } from '@prisma/client'; // Asegúrate de importar ManagedListType
 import bcrypt from 'bcryptjs';
 
 // Inicializar Prisma Client
 const prisma = new PrismaClient();
+
+// Valores iniciales para las listas gestionables (similares a tus constantes originales)
+const initialListValues = {
+  [ManagedListType.TIPOS_DE_DOCUMENTO]: [
+    "Cédula de Ciudadanía",
+    "Cédula de Extranjería",
+    "Pasaporte",
+    "Tarjeta de Identidad",
+    "NIT",
+    "PEP (Permiso Especial de Permanencia)",
+    "PPT (Permiso por Protección Temporal)"
+  ],
+  [ManagedListType.GENEROS]: [
+    "Masculino",
+    "Femenino",
+    "Otro",
+    "Prefiero no decirlo"
+  ],
+  [ManagedListType.FACTORES_RH]: [
+    "O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"
+  ],
+  [ManagedListType.TIPOS_DE_VISITA]: [
+    "Visita Programada",
+    "Visita Espontánea",
+    "Entrega de Mercancía/Proveedor",
+    "Reunión de Negocios",
+    "Entrevista de Trabajo",
+    "Servicio Técnico/Mantenimiento",
+    "Auditoría/Inspección",
+    "Evento/Capacitación",
+    "Familiar/Personal Empleado",
+    "Otro"
+  ],
+  [ManagedListType.ARLS]: [ // Ejemplo, ajusta según tus necesidades
+    "Sura",
+    "Positiva",
+    "Colmena",
+    "Bolívar",
+    "Liberty",
+    "Mapfre",
+    "No Aplica"
+  ],
+  [ManagedListType.EPSS]: [ // Ejemplo, ajusta según tus necesidades
+    "Sura EPS",
+    "Sanitas",
+    "Compensar",
+    "Nueva EPS",
+    "Salud Total",
+    "Coomeva EPS (en liquidación)",
+    "Aliansalud",
+    "Famisanar",
+    "SOS (Servicio Occidental de Salud)",
+    "No Aplica"
+  ],
+  [ManagedListType.PARENTESCOS_CONTACTO_EMERGENCIA]: [
+    "Esposo(a)/Compañero(a)",
+    "Hijo(a)",
+    "Padre",
+    "Madre",
+    "Hermano(a)",
+    "Tío(a)",
+    "Abuelo(a)",
+    "Amigo(a)",
+    "Otro"
+  ]
+};
+
+
+async function seedManagedList(listType: ManagedListType, items: string[]) {
+  console.log(`Seeding list: ${listType}...`);
+  let createdCount = 0;
+  let existingCount = 0;
+
+  for (const [index, value] of items.entries()) {
+    const existingItem = await prisma.managedListItem.findUnique({
+      where: {
+        listType_value: { // Usar el nombre del índice unique que definimos
+          listType: listType,
+          value: value,
+        },
+      },
+    });
+
+    if (!existingItem) {
+      await prisma.managedListItem.create({
+        data: {
+          listType: listType,
+          value: value,
+          order: index + 1, // Asignar un orden basado en la posición en el array
+          isActive: true,
+        },
+      });
+      createdCount++;
+    } else {
+      existingCount++;
+      // Opcional: Actualizar el orden si es necesario
+      if (existingItem.order !== index + 1) {
+        await prisma.managedListItem.update({
+          where: { id: existingItem.id },
+          data: { order: index + 1 }
+        });
+        console.log(`  Updated order for item "${value}" in list ${listType}.`);
+      }
+    }
+  }
+  if (createdCount > 0) console.log(`  Created ${createdCount} new items for ${listType}.`);
+  if (existingCount > 0 && createdCount === 0) console.log(`  All ${existingCount} items for ${listType} already exist.`);
+  else if (existingCount > 0) console.log(`  ${existingCount} items for ${listType} already existed.`);
+}
+
 
 async function main() {
   console.log(`Start seeding ...`);
@@ -17,7 +127,7 @@ async function main() {
     sede = await prisma.sede.create({
       data: {
         name: sedeName,
-        address: 'Autopista Norte Km 21, Vía Gachancipá, Tocancipá, Cundinamarca', // Dirección más específica
+        address: 'Autopista Norte Km 21, Vía Gachancipá, Tocancipá, Cundinamarca',
       },
     });
     console.log(`Created sede "${sedeName}" with id: ${sede.id}`);
@@ -26,7 +136,7 @@ async function main() {
   }
 
   // --- 2. Crear Empleado para el Admin Principal (si no existe) ---
-  const adminIdentification = 'admin'; 
+  const adminIdentification = 'admin';
   const adminFullName = 'Administrador Principal';
 
   let adminEmpleado = await prisma.empleado.findUnique({
@@ -38,8 +148,8 @@ async function main() {
       data: {
         identificacion: adminIdentification,
         nombreApellido: adminFullName,
-        cargo: 'System Administrator', 
-        sedeId: sede.id, // Usar el ID de la sede "Tocancipa"
+        cargo: 'System Administrator',
+        sedeId: sede.id,
       },
     });
     console.log(`Created empleado "${adminFullName}" (Identificación: ${adminIdentification}) with id: ${adminEmpleado.id}`);
@@ -48,22 +158,20 @@ async function main() {
   }
 
   // --- 3. Crear UsuarioPlataforma Admin Principal (si no existe) ---
-  // Contraseña para el usuario admin. ¡CAMBIAR ESTO PARA PRODUCCIÓN!
-  // En un escenario real, esta contraseña debería ser más segura o gestionada a través de variables de entorno para el seed.
-  const adminPassword = 'admin123'; 
+  const adminPassword = 'admin123';
 
   let adminUsuario = await prisma.usuarioPlataforma.findUnique({
-    where: { empleadoId: adminEmpleado.id }, // La relación es 1 a 1, empleadoId es unique
+    where: { empleadoId: adminEmpleado.id },
   });
 
   if (!adminUsuario) {
-    const hashedPassword = await bcrypt.hash(adminPassword, 10); // 10-12 salt rounds es un buen balance
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
     adminUsuario = await prisma.usuarioPlataforma.create({
       data: {
         empleadoId: adminEmpleado.id,
         rol: RolUsuarioPlataforma.AdminPrincipal,
         passwordHash: hashedPassword,
-        canManageAutoregister: true, 
+        canManageAutoregister: true,
         isActive: true,
       },
     });
@@ -71,37 +179,29 @@ async function main() {
     console.log(`  >>> Login with Identificación: ${adminIdentification} and Password: ${adminPassword} (Password for development only)`);
   } else {
     console.log(`UsuarioPlataforma for "${adminFullName}" (Rol: ${adminUsuario.rol}) already exists.`);
-    // Opcional: Podrías añadir lógica para actualizar el rol o la contraseña si fuera necesario,
-    // pero para un seed simple, solo crear si no existe suele ser suficiente.
-    // Ejemplo: si quieres asegurar que siempre sea AdminPrincipal y esté activo:
-    // if (adminUsuario.rol !== RolUsuarioPlataforma.AdminPrincipal || !adminUsuario.isActive) {
-    //   const hashedPasswordIfNeeded = await bcrypt.hash(adminPassword, 10); // Re-hashear solo si la contraseña también necesita actualizarse
-    //   await prisma.usuarioPlataforma.update({
-    //     where: { id: adminUsuario.id },
-    //     data: {
-    //       rol: RolUsuarioPlataforma.AdminPrincipal,
-    //       isActive: true,
-    //       // passwordHash: hashedPasswordIfNeeded, // Descomentar si se quiere forzar la actualización de contraseña
-    //     },
-    //   });
-    //   console.log(`Updated UsuarioPlataforma for "${adminFullName}" to ensure AdminPrincipal role and active status.`);
-    // }
   }
 
-  // --- Puedes añadir más datos semilla aquí si lo necesitas ---
-  // Por ejemplo, otros roles, otros empleados, etc.
+  // --- 4. Sembrar las Listas Gestionables ---
+  console.log("\nSeeding Managed Lists...");
+  for (const key in initialListValues) {
+    const listTypeKey = key as keyof typeof initialListValues; // Asegurar que la clave es un tipo de ManagedListType
+    // Verificar que listTypeKey sea realmente un valor del enum ManagedListType
+    if (Object.values(ManagedListType).includes(listTypeKey as ManagedListType)) {
+        await seedManagedList(listTypeKey as ManagedListType, initialListValues[listTypeKey]);
+    } else {
+        console.warn(`  Skipping unknown list type in seed: ${listTypeKey}`);
+    }
+  }
 
-  console.log(`Seeding finished.`);
+  console.log(`\nSeeding finished.`);
 }
 
 main()
   .then(async () => {
-    // Desconectar Prisma Client al finalizar
     await prisma.$disconnect();
   })
   .catch(async (e) => {
     console.error('Error during seeding process:', e);
-    // Desconectar Prisma Client en caso de error
     await prisma.$disconnect();
-    process.exit(1); // Salir con código de error
+    process.exit(1);
   });

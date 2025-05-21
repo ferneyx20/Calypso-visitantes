@@ -1,256 +1,109 @@
-
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  visitorRegistrationSchema,
-  type VisitorFormData,
-  TIPO_DOCUMENTO,
-  GENERO,
-  RH,
-  TIPO_VISITA_OPTIONS,
-  ARL_OPTIONS,
-  EPS_OPTIONS,
-  toWritableArray,
-} from "@/app/(app)/admin-dashboard/visitors/schemas"; 
+import { useState, useCallback, useEffect } from "react"; // useMemo no se usa aquí
+// useForm y SubmitHandler ya no son necesarios aquí, se manejan en VisitorRegistrationForm
+// zodResolver y el schema local ya no son necesarios aquí
+// Las constantes de schemas ya no se importan aquí para las opciones
+import type { FullVisitorFormData } from "@/components/visitor/visitor-registration-form"; // Importar el tipo unificado
 
 import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
+// Form ya no es necesario aquí
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ScanFace, Building } from "lucide-react";
-import VisitorRegistrationFormFields from "@/components/visitor/visitor-registration-form-fields"; 
+import { Loader2, ScanFace } from "lucide-react"; // Removido Building si no se usa
+// VisitorRegistrationFormFields ya no se importa/usa directamente aquí
+import VisitorRegistrationForm from "@/components/visitor/visitor-registration-form"; // Importar el formulario completo
 import Image from "next/image";
 
 // Interfaz para datos de empleado para el combobox
 interface EmployeeOption {
-  value: string; // employee ID
-  label: string; // "Nombre Apellido (ID: Identificacion)"
+  value: string; 
+  label: string;
 }
 
-
-const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  const debounced = (...args: Parameters<F>) => {
-    if (timeout !== null) {
-      clearTimeout(timeout);
-      timeout = null;
-    }
-    timeout = setTimeout(() => func(...args), waitFor);
-  };
-  return debounced as (...args: Parameters<F>) => ReturnType<F>;
-};
+// debounce ya no es necesario aquí
+// const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => { ... };
 
 export default function AutoregistroPage() {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCategorizing, setIsCategorizing] = useState(false);
-  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
-
-  // Estados para opciones de comboboxes
-  const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
-  const [generoOptions, setGeneroOptions] = useState<string[]>(toWritableArray(GENERO));
-  const [rhOptions, setRhOptions] = useState<string[]>(toWritableArray(RH));
-  const [tipoVisitaOptions, setTipoVisitaOptions] = useState<string[]>(toWritableArray(TIPO_VISITA_OPTIONS));
-  const [arlOptions, setArlOptions] = useState<string[]>(toWritableArray(ARL_OPTIONS));
-  const [epsOptions, setEpsOptions] = useState<string[]>(toWritableArray(EPS_OPTIONS));
+  // isSubmitting, isCategorizing, suggestedCategory ahora se manejan dentro de VisitorRegistrationForm
+  
+  // Ya no necesitamos estados locales para las opciones de lista aquí
+  // const [tipoDocumentoOptions, setTipoDocumentoOptions] = useState<string[]>(toWritableArray(TIPO_DOCUMENTO));
+  // ... y así para las demás listas ...
+  
+  // Este estado se usa para el combobox de persona visitada, que se pasa a VisitorRegistrationForm
   const [employeeComboboxOptions, setEmployeeComboboxOptions] = useState<EmployeeOption[]>([]);
 
-  const form = useForm<VisitorFormData>({
-    resolver: zodResolver(visitorRegistrationSchema),
-    defaultValues: {
-      personavisitada: "", // Esto almacenará el label del combobox de empleado
-      purpose: "",
-      category: "",
-      tipodocumento: undefined,
-      genero: undefined,
-      rh: undefined,
-      tipovisita: undefined,
-      arl: undefined,
-      eps: undefined,
-      empresaProviene: "",
-      numerocarnet: "",
-      vehiculoPlaca: "",
-      photoDataUri: "",
-    },
-  });
+  // El useForm principal ahora está dentro de VisitorRegistrationForm
+  // const form = useForm<VisitorFormData>({ ... });
+  // const purposeValue = form.watch("purpose");
 
-  const purposeValue = form.watch("purpose");
-
+  // fetchEmployeesForCombobox se podría mover a VisitorRegistrationForm o mantenerse aquí
+  // y pasar las opciones. Por consistencia con la carga de otras listas,
+  // VisitorRegistrationForm podría cargar esto también si fuera necesario.
+  // Sin embargo, como es un prop específico para el formulario, está bien aquí por ahora.
   const fetchEmployeesForCombobox = async () => {
     try {
-      const response = await fetch('/api/empleados');
-      if (!response.ok) throw new Error('Error al cargar empleados');
+      const response = await fetch('/api/empleados?activo=true'); // Solo empleados activos para autoregistro
+      if (!response.ok) throw new Error('Error al cargar empleados disponibles');
       const employees: {id: string, nombreApellido: string, identificacion: string}[] = await response.json();
       setEmployeeComboboxOptions(
         employees.map(emp => ({
           value: emp.id,
-          label: `${emp.nombreApellido} (ID: ${emp.identificacion})`,
+          label: `${emp.nombreApellido}`, // Simplificado para autoregistro
         }))
       );
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los empleados para el selector." });
+      console.error("Error fetching employees for autoregistro:", error);
+      toast({ variant: "destructive", title: "Error", description: "No se pudieron cargar los empleados anfitriones." });
     }
   };
 
   useEffect(() => {
     fetchEmployeesForCombobox();
-  }, []);
+  }, []); // Quitado toast de dependencias si no se usa directamente en este efecto
 
+  // fetchCategorySuggestion y su useEffect ya no son necesarios aquí, están en VisitorRegistrationForm
 
-  const fetchCategorySuggestion = useCallback(async (purposeText: string) => {
-    if (purposeText.trim().length < 10) {
-      setSuggestedCategory(null);
-      form.setValue("category", "");
-      return;
-    }
-    setIsCategorizing(true);
-    try {
-      const response = await fetch("/api/categorize-visit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose: purposeText }),
-      });
-      if (!response.ok) throw new Error("Error al obtener la categoría");
-      const data = await response.json();
-      setSuggestedCategory(data.suggestedCategory);
-      if (data.suggestedCategory) {
-        form.setValue("category", data.suggestedCategory);
-      }
-    } catch (error) {
-      console.error("Error fetching category:", error);
-      setSuggestedCategory(null);
-      form.setValue("category", "");
-    } finally {
-      setIsCategorizing(false);
-    }
-  }, [form]);
-
-  const debouncedFetchCategory = useCallback(debounce(fetchCategorySuggestion, 750), [fetchCategorySuggestion]);
-
-  useEffect(() => {
-    if (purposeValue) {
-      debouncedFetchCategory(purposeValue);
-    } else {
-      setSuggestedCategory(null);
-      form.setValue("category", "");
-    }
-  }, [purposeValue, debouncedFetchCategory, form]);
-
-  const onSubmit: SubmitHandler<VisitorFormData> = async (formData) => {
-    setIsSubmitting(true);
-    
-    const selectedEmployee = employeeComboboxOptions.find(opt => opt.label === formData.personavisitada);
-    const personavisitadaId = selectedEmployee ? selectedEmployee.value : null;
-
-    const apiPayload = {
-      ...formData,
-      fechanacimiento: formData.fechanacimiento.toISOString(),
-      personavisitadaId: personavisitadaId,
-    };
-    // @ts-ignore
-    delete apiPayload.personavisitada;
-
-    try {
-        const response = await fetch('/api/visitantes', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(apiPayload)
-        });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Error al enviar el registro.");
-        }
-        
-        toast({
-            title: "Autoregistro Enviado",
-            description: "Su información ha sido enviada. Por favor, espere confirmación en recepción.",
-            duration: 5000,
-        });
-        form.reset();
-        setSuggestedCategory(null);
-    } catch (error) {
-        console.error("Error en autoregistro:", error);
-        toast({
-            variant: "destructive",
-            title: "Error en el Registro",
-            description: (error as Error).message || "No se pudo completar su registro. Intente de nuevo.",
-        });
-    } finally {
-        setIsSubmitting(false);
-    }
+  const handleAutoregistroSubmitSuccess = (data: FullVisitorFormData) => {
+    // Esta función se llamará desde VisitorRegistrationForm cuando el envío sea exitoso
+    console.log("Autoregistro enviado:", data);
+    // Aquí puedes mostrar un mensaje de "Gracias" más permanente o redirigir a una página de confirmación.
+    // Por ahora, el toast ya se muestra desde VisitorRegistrationForm.
+    // El reset del formulario también se hace dentro de VisitorRegistrationForm.
   };
 
-  const handleAddOptionToList = (
-    optionValue: string,
-    optionsList: string[],
-    setOptionsList: React.Dispatch<React.SetStateAction<string[]>>
-  ) => {
-    if (optionValue && !optionsList.some(opt => opt.toLowerCase() === optionValue.toLowerCase())) {
-      setOptionsList(prev => [...prev, optionValue]);
-    }
-  };
+  // handleAddOptionToList ya no es necesaria aquí
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <header className="mb-8 text-center">
+    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-background flex flex-col items-center justify-center p-4 selection:bg-primary/30">
+      <header className="mb-6 sm:mb-8 text-center">
           <Image
-            src="/images/pelican_logo.png"
-            alt="Logo Empresa"
+            src="/images/pelican_logo.png" // Asegúrate que esta ruta sea correcta desde public/
+            alt="Logo Calypso del Caribe"
             width={100}
             height={100}
-            className="mx-auto mb-4"
-            data-ai-hint="pelican logo"
+            className="mx-auto mb-4 rounded-md"
+            priority
           />
-        <h1 className="text-3xl font-bold text-primary flex items-center justify-center">
-          <ScanFace className="mr-3 h-8 w-8" />
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary flex items-center justify-center">
+          <ScanFace className="mr-2 sm:mr-3 h-7 w-7 sm:h-8 sm:w-8" />
           Autoregistro de Visitantes
         </h1>
-        <p className="text-muted-foreground mt-2">
-          Complete el siguiente formulario para registrar su visita.
+        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+          Bienvenido. Por favor, complete el siguiente formulario para registrar su visita.
         </p>
       </header>
 
-      <main className="w-full max-w-3xl bg-card p-6 sm:p-8 rounded-lg shadow-xl">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <VisitorRegistrationFormFields
-              form={form}
-              isCategorizing={isCategorizing}
-              suggestedCategory={suggestedCategory}
-              tipoDocumentoOptions={tipoDocumentoOptions}
-              onAddTipoDocumento={(newOption) => handleAddOptionToList(newOption, tipoDocumentoOptions, setTipoDocumentoOptions)}
-              generoOptions={generoOptions}
-              onAddGenero={(newOption) => handleAddOptionToList(newOption, generoOptions, setGeneroOptions)}
-              rhOptions={rhOptions}
-              onAddRh={(newOption) => handleAddOptionToList(newOption, rhOptions, setRhOptions)}
-              tipoVisitaOptions={tipoVisitaOptions}
-              onAddTipoVisita={(newOption) => handleAddOptionToList(newOption, tipoVisitaOptions, setTipoVisitaOptions)}
-              arlOptions={arlOptions}
-              onAddArl={(newOption) => handleAddOptionToList(newOption, arlOptions, setArlOptions)}
-              epsOptions={epsOptions}
-              onAddEps={(newOption) => handleAddOptionToList(newOption, epsOptions, setEpsOptions)}
-              employeeComboboxOptions={employeeComboboxOptions}
-              showScannerSection={false}
-            />
-            <div className="mt-8">
-              <Button type="submit" className="w-full" disabled={isSubmitting || isCategorizing}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Enviando Registro...
-                  </>
-                ) : (
-                  "Enviar Registro"
-                )}
-              </Button>
-            </div>
-          </form>
-        </Form>
+      <main className="w-full max-w-3xl"> {/* El formulario completo gestionará el Card y Form */}
+        <VisitorRegistrationForm 
+            isAutoregistro={true} 
+            onSubmitSuccess={handleAutoregistroSubmitSuccess}
+            employeeComboboxOptions={employeeComboboxOptions}
+        />
       </main>
-      <footer className="mt-8 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} Calypso del Caribe. Todos los derechos reservados.</p>
+      <footer className="mt-8 text-center text-xs sm:text-sm text-muted-foreground">
+        <p>© {new Date().getFullYear()} Calypso del Caribe S.A.S. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
