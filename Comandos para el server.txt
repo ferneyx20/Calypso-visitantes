@@ -2,10 +2,11 @@
 npm install
 npm install prisma
 npx prisma generate
-Remove-Item -Recurse -Force prisma\migrations
-rm -rf prisma/migrations
-npx prisma migrate reset
-npx prisma migrate dev --name init_db
+Remove-Item -Recurse -Force prisma\migrations  remover migración
+npx prisma migrate dev --name init_db insertar estructura de base datos
+rm -rf prisma/migrations remover migración forsada
+npx prisma migrate reset insertar nuevos datos reseteando base
+npx prisma db seed insertar nuevos datos sin borrar
 npm install bcryptjs
 npm install -D @types/bcryptjs
 npm install -D typescript ts-node @types/node @types/bcryptjs
@@ -14,6 +15,15 @@ npm install -D @types/papaparse
 npm install jsonwebtoken
 npm install -D @types/jsonwebtoken
 npm run dev
+
+
+cedula:
+1007430584	PULIDO	PULIDO	JHOAN	FERNEY	M	22602000	B+
+
+1007430584	PULIDO	PULIDO	JHOAN	FERNEY	M	22602000	B+
+
+
+
 
 
 POSTGRES_HOST=localhost
