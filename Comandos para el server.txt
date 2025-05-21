@@ -4,9 +4,13 @@ npm install prisma
 npx prisma generate
 Remove-Item -Recurse -Force prisma\migrations
 rm -rf prisma/migrations
+npx prisma migrate reset
 npx prisma migrate dev --name init_db
 npm install bcryptjs
 npm install -D @types/bcryptjs
+npm install -D typescript ts-node @types/node @types/bcryptjs
+npm install papaparse
+npm install -D @types/papaparse
 npm install jsonwebtoken
 npm install -D @types/jsonwebtoken
 npm run dev

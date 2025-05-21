@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, type ChangeEvent, useEffect, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search, Pencil, Trash2, CheckCircle } from "lucide-react";
+import { UsersRound, Upload, FileText, Loader2, Plus, UserPlus, Search, Pencil, Trash2, CheckCircle, AlertTriangle, Info } from "lucide-react"; // Agregado AlertTriangle, Info
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,8 +23,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog"; // AlertDialogTrigger no se usa directamente en la tabla ahora
 import {
   Select,
   SelectContent,
@@ -34,15 +32,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { notify } from "@/components/layout/app-header"; // Importar el emisor de notificaciones
-
+import { notify } from "@/components/layout/app-header";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Para mostrar resultados del CSV
 
 const employeeFormSchema = z.object({
   id: z.string().optional(),
   identificacion: z.string().min(5, { message: "La identificación debe tener al menos 5 caracteres." }),
   nombreApellido: z.string().min(3, { message: "El nombre y apellido debe tener al menos 3 caracteres." }),
   cargo: z.string().min(3, { message: "El cargo debe tener al menos 3 caracteres." }),
-  sedeId: z.string().min(1, { message: "Debe seleccionar una sede." }), 
+  sedeId: z.string().min(1, { message: "Debe seleccionar una sede." }),
 });
 
 type EmployeeFormData = z.infer<typeof employeeFormSchema>;
@@ -53,19 +51,29 @@ interface Sede {
 }
 
 interface EmployeeFromAPI extends EmployeeFormData {
-  id: string; 
-  sede?: { name: string }; 
+  id: string;
+  sede?: { name: string };
   createdAt?: Date;
   updatedAt?: Date;
+}
+
+// NUEVO: Interfaz para la respuesta del backend al subir CSV
+interface CSVUploadResponse {
+  message: string;
+  successCount: number;
+  errorCount: number;
+  errors: Array<{ row: number; identificacion?: string; error: string }>;
+  createdEmployees?: Partial<EmployeeFromAPI>[]; // Opcional: para actualizar la lista
 }
 
 
 export default function EmployeesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<CSVUploadResponse | null>(null); // NUEVO: Estado para resultado de carga
   const [isAddEmployeeDialogOpen, setIsAddEmployeeDialogOpen] = useState(false);
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
-  
+
   const [employeesList, setEmployeesList] = useState<EmployeeFromAPI[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
@@ -120,9 +128,10 @@ export default function EmployeesPage() {
 
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setUploadResult(null); // Limpiar resultados anteriores al seleccionar nuevo archivo
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
-      if (file.type === "text/csv") {
+      if (file.type === "text/csv" || file.name.endsWith('.csv')) { // Aceptar text/csv o por extensión
         setSelectedFile(file);
       } else {
         toast({
@@ -131,7 +140,7 @@ export default function EmployeesPage() {
           variant: "destructive",
         });
         setSelectedFile(null);
-        event.target.value = ""; 
+        event.target.value = "";
       }
     }
   };
@@ -141,22 +150,86 @@ export default function EmployeesPage() {
       toast({
         title: "Sin archivo",
         description: "Por favor, seleccione un archivo CSV para cargar.",
-        variant: "destructive",
+        variant: "warning", // Cambiado a warning
       });
       return;
     }
     setIsUploading(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsUploading(false);
-    toast({
-      title: "Carga Exitosa (Simulada)",
-      description: `El archivo ${selectedFile.name} ha sido procesado. Los empleados (si son válidos) deberían aparecer en la lista.`,
-    });
-    setSelectedFile(null);
-    const fileInput = document.getElementById('csv-upload') as HTMLInputElement;
-    if (fileInput) fileInput.value = "";
+    setUploadResult(null); // Limpiar resultados anteriores
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const response = await fetch('/api/empleados/upload-csv', { // NUEVO ENDPOINT
+        method: 'POST',
+        body: formData,
+        // No establecer 'Content-Type': 'multipart/form-data' manualmente,
+        // el navegador lo hace automáticamente con FormData y añade el boundary correcto.
+      });
+
+      const result: CSVUploadResponse = await response.json();
+      setUploadResult(result); // Guardar el resultado completo
+
+      if (!response.ok && response.status !== 207) { // 207 es Multi-Status (éxitos parciales)
+        throw new Error(result.message || 'Error desconocido al procesar el CSV.');
+      }
+
+      if (result.successCount > 0) {
+        toast({
+          title: "Procesamiento CSV Finalizado",
+          description: `${result.successCount} empleado(s) creado(s)/actualizado(s) exitosamente. ${result.errorCount > 0 ? `${result.errorCount} con errores.` : ''}`,
+          variant: result.errorCount > 0 ? "default" : "success", // default (azul) si hay errores, success si no
+          duration: 7000,
+        });
+        fetchEmployees(); // Recargar la lista de empleados
+        notify.new({
+          icon: <CheckCircle className="h-5 w-5 text-green-500" />,
+          title: "Carga CSV Exitosa",
+          description: `${result.successCount} empleado(s) importado(s).`,
+          type: 'employee_created', // o un nuevo tipo 'csv_upload_success'
+          read: false
+        });
+      } else if (result.errorCount > 0) {
+         toast({
+          title: "Procesamiento CSV con Errores",
+          description: `No se crearon empleados. Se encontraron ${result.errorCount} errores. Revise los detalles.`,
+          variant: "destructive",
+          duration: 7000,
+        });
+      } else { // Ni success ni errores, mensaje genérico
+         toast({
+          title: "Procesamiento CSV",
+          description: result.message || "El archivo fue procesado.",
+          duration: 5000,
+        });
+      }
+
+    } catch (error) {
+      console.error("Error al subir CSV:", error);
+      const errorMessage = (error instanceof Error) ? error.message : "Ocurrió un error inesperado.";
+      setUploadResult({ // Para mostrar el error en la UI
+        message: `Error en la carga: ${errorMessage}`,
+        successCount: 0,
+        errorCount: selectedFile ? 1 : 0, // Asumir 1 error si hubo un archivo
+        errors: [{ row: 0, error: errorMessage }],
+      });
+      toast({
+        title: "Error en Carga de CSV",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Mantener el archivo seleccionado para que el usuario vea el nombre,
+      // pero limpiar el input para permitir reseleccionar el mismo archivo si es necesario.
+      const fileInput = document.getElementById('csv-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = ""; // Permite volver a seleccionar el mismo archivo
+      // No limpiar selectedFile aquí para que se pueda ver el nombre y el resultado asociado a él.
+      // setSelectedFile(null);
+    }
   };
 
+  // ... (resto de los handlers: handleOpenFormDialog, onManualSubmit, etc. permanecen igual)
   const handleOpenFormDialog = (employee?: EmployeeFromAPI) => {
     if (employee) {
       setEditingEmployee(employee);
@@ -251,7 +324,7 @@ export default function EmployeesPage() {
         icon: <Trash2 className="h-5 w-5 text-red-500" />,
         title: "Empleado Eliminado",
         description: `El empleado ${employeeToDelete.nombreApellido} fue eliminado.`,
-        type: 'user_updated', // Podría ser un tipo 'employee_deleted'
+        type: 'user_updated', 
         read: false
       });
       fetchEmployees(); 
@@ -301,7 +374,6 @@ export default function EmployeesPage() {
     }
   };
 
-
   const handleSelectAll = (checked: boolean | "indeterminate") => {
     if (checked === true) {
       setSelectedEmployeeIds(filteredEmployees.map(emp => emp.id!));
@@ -336,8 +408,10 @@ export default function EmployeesPage() {
   const isAllSelected = filteredEmployees.length > 0 && selectedEmployeeIds.length === filteredEmployees.length;
   const isSomeSelected = selectedEmployeeIds.length > 0 && selectedEmployeeIds.length < filteredEmployees.length;
 
+
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
+      {/* ... (Título y botón Agregar Empleado igual que antes) ... */}
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-3xl font-semibold flex items-center">
           <UsersRound className="mr-3 h-8 w-8 text-primary" />
@@ -461,6 +535,7 @@ export default function EmployeesPage() {
         </Dialog>
       </div>
 
+      {/* ... (Sección de eliminación en lote igual que antes) ... */}
       {selectedEmployeeIds.length > 0 && (
         <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md border">
             <span className="text-sm text-muted-foreground">{selectedEmployeeIds.length} empleado(s) seleccionado(s)</span>
@@ -493,6 +568,7 @@ export default function EmployeesPage() {
         </div>
       )}
 
+      {/* ... (Tabla de empleados igual que antes) ... */}
       <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Lista de Empleados</CardTitle>
@@ -591,6 +667,7 @@ export default function EmployeesPage() {
         </CardContent>
       </Card>
 
+      {/* Sección de Carga de CSV MODIFICADA */}
       <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Cargar Empleados desde CSV</CardTitle>
@@ -598,9 +675,9 @@ export default function EmployeesPage() {
             Seleccione un archivo CSV para importar la lista de empleados.
             El archivo debe tener las siguientes columnas en este orden:
             <code className="block bg-muted p-2 rounded-md my-2 text-sm">
-              identificacion,nombre y apellido,cargo,sede_id
+              identificacion,nombre y apellido,cargo,nombre_sede {/* MODIFICADO: nombre_sede */}
             </code>
-             Asegúrese de que la primera fila contenga estas cabeceras y que `sede_id` corresponda a un ID de sede existente.
+             Asegúrese de que la primera fila contenga estas cabeceras y que <code className="text-xs bg-muted p-0.5 rounded">nombre_sede</code> corresponda a un nombre de sede existente y escrito exactamente igual.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -610,13 +687,13 @@ export default function EmployeesPage() {
               <Input
                 id="csv-upload"
                 type="file"
-                accept=".csv"
+                accept=".csv,text/csv" // Más explícito
                 onChange={handleFileChange}
                 className="max-w-md file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
               />
             </div>
           </div>
-          {selectedFile && (
+          {selectedFile && !uploadResult && ( // Mostrar detalles del archivo solo si no hay resultado aún
             <div className="p-3 bg-muted/50 rounded-md border border-border">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <FileText className="h-5 w-5 text-primary" />
@@ -627,24 +704,58 @@ export default function EmployeesPage() {
               </div>
             </div>
           )}
+
+          {/* NUEVO: Mostrar resultados de la carga del CSV */}
+          {uploadResult && (
+            <Alert variant={uploadResult.errorCount > 0 && uploadResult.successCount === 0 ? "destructive" : (uploadResult.errorCount > 0 ? "warning" : "success")}>
+              <div className="flex items-start gap-2">
+                {uploadResult.errorCount > 0 && uploadResult.successCount === 0 ? <AlertTriangle className="h-5 w-5" /> : <Info className="h-5 w-5"/>}
+                <div>
+                  <AlertTitle>
+                    {uploadResult.successCount > 0 && uploadResult.errorCount === 0 ? "Carga Exitosa" : 
+                     uploadResult.successCount > 0 && uploadResult.errorCount > 0 ? "Carga Parcialmente Exitosa" :
+                     uploadResult.errorCount > 0 ? "Carga Fallida" : "Resultado de la Carga"}
+                  </AlertTitle>
+                  <AlertDescription>
+                    <p>{uploadResult.message}</p>
+                    <p>Registros procesados correctamente: {uploadResult.successCount}</p>
+                    <p>Registros con errores: {uploadResult.errorCount}</p>
+                    {uploadResult.errors && uploadResult.errors.length > 0 && (
+                      <div className="mt-2 max-h-40 overflow-y-auto text-xs">
+                        <p className="font-semibold">Detalles de errores:</p>
+                        <ul className="list-disc pl-5">
+                          {uploadResult.errors.map((err, index) => (
+                            <li key={index}>
+                              Fila {err.row}: {err.identificacion ? `(ID: ${err.identificacion}) ` : ''}{err.error}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </div>
+              </div>
+            </Alert>
+          )}
         </CardContent>
         <CardFooter>
           <Button onClick={handleUpload} disabled={!selectedFile || isUploading}>
             {isUploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Cargando...
+                Cargando y Procesando... {/* Texto más descriptivo */}
               </>
             ) : (
               <>
                 <Upload className="mr-2 h-4 w-4" />
-                Cargar y Procesar CSV (Simulado)
+                Cargar y Procesar CSV
               </>
             )}
           </Button>
         </CardFooter>
       </Card>
 
+      {/* ... (AlertDialog para eliminar empleado igual que antes) ... */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
