@@ -45,7 +45,7 @@ model UsuarioPlataforma {
   empleadoId            String            @unique // Un empleado solo puede ser un usuario de plataforma
   empleado              Empleado          @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
   rol                   RolUsuarioPlataforma
-  passwordHash          String // IMPORTANTE: Almacenar hash de contraseña, no la contraseña en texto plano
+  passwordHash          String
   canManageAutoregister Boolean           @default(false)
   isActive              Boolean           @default(true)
   createdAt             DateTime          @default(now())
@@ -58,39 +58,40 @@ model UsuarioPlataforma {
 enum EstadoVisita {
   activa
   finalizada
-  cancelada // Podría ser útil en el futuro
+  cancelada
 }
 
 model Visitante {
   id                           String    @id @default(cuid())
   // Información del visitante
-  tipodocumento                String    // Este campo ahora se llenará desde ManagedListItem
+  tipodocumento                String
   numerodocumento              String
   nombres                      String
   apellidos                    String
-  genero                       String    // Este campo ahora se llenará desde ManagedListItem
+  genero                       String
   fechanacimiento              DateTime
-  rh                           String    // Este campo ahora se llenará desde ManagedListItem
+  rh                           String
   telefono                     String
-  photoDataUri                 String?   @db.Text
+  // photoDataUri                 String?   @db.Text // Comentado: Reemplazado por photoFilename
+  photoFilename                String?   // NUEVO: Nombre del archivo de la foto guardada en el servidor
   // Detalles de la visita
   personavisitadaId            String?
   personavisitada              Empleado? @relation("VisitanteToAnfitrion", fields: [personavisitadaId], references: [id], onDelete: SetNull)
   purpose                      String
   category                     String?
-  tipovisita                   String    // Este campo ahora se llenará desde ManagedListItem
+  tipovisita                   String
   // Información adicional (opcional)
   empresaProviene              String?
-  numerocarnet                 String?
+  numerocarnet                 String?   // Considerar si este debería ser Int? si es un número del 1-20
   vehiculoPlaca                String?
   // Salud y Seguridad
-  arl                          String    // Este campo ahora se llenará desde ManagedListItem
-  eps                          String    // Este campo ahora se llenará desde ManagedListItem
+  arl                          String
+  eps                          String
   // Contacto de Emergencia
   contactoemergencianombre     String
   contactoemergenciaapellido   String
   contactoemergenciatelefono   String
-  contactoemergenciaparentesco String    // Este campo ahora se llenará desde ManagedListItem
+  contactoemergenciaparentesco String
   // Metadata de la visita
   horaentrada                  DateTime  @default(now())
   horasalida                   DateTime?
@@ -106,7 +107,6 @@ model Visitante {
   @@index([estado])
 }
 
-// --- NUEVAS DEFINICIONES PARA LISTAS GESTIONABLES ---
 enum ManagedListType {
   TIPOS_DE_DOCUMENTO
   GENEROS
@@ -115,21 +115,18 @@ enum ManagedListType {
   ARLS
   EPSS
   PARENTESCOS_CONTACTO_EMERGENCIA
-  // Puedes añadir más tipos de listas aquí según necesites
-  // Por ejemplo: TIPOS_VEHICULO, MOTIVOS_VISITA_ESPECIFICOS, etc.
 }
 
 model ManagedListItem {
   id        String          @id @default(cuid())
-  listType  ManagedListType // Indica a qué lista pertenece este ítem
-  value     String          // El valor del ítem, ej: "Cédula de Ciudadanía"
-  order     Int?            // Opcional: si necesitas un orden específico dentro de la lista
-  isActive  Boolean         @default(true) // Para desactivar opciones en lugar de borrarlas permanentemente
+  listType  ManagedListType
+  value     String
+  order     Int?
+  isActive  Boolean         @default(true)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
-  @@unique([listType, value]) // Asegura que no haya valores duplicados dentro de la misma lista
-  @@index([listType])         // Para búsquedas eficientes por tipo de lista
-  @@index([listType, order])  // Si decides usar 'order'
+  @@unique([listType, value])
+  @@index([listType])
+  @@index([listType, order])
 }
-// --- FIN DE NUEVAS DEFINICIONES ---

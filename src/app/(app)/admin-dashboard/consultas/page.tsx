@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,12 +5,12 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import { Calendar as CalendarIcon, Search, FileDown, History, Loader2, Eye as EyeIcon, UserSquare2 } from "lucide-react"; 
-import Image from "next/image";
+import Image from "next/image"; // Importar next/image
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogClose, DialogFooter } from "@/components/ui/dialog"; // DialogTrigger no se usa aquí
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -35,7 +34,8 @@ interface VisitorFromAPI {
     empresaProviene?: string;
     vehiculoPlaca?: string;
     numerocarnet?: string;
-    photoDataUri?: string;
+    // photoDataUri?: string; // Ya no se usará para mostrar, se reemplaza por photoFilename
+    photoFilename?: string | null; // NUEVO: Para el nombre del archivo de la foto
     telefono?: string;
     fechanacimiento?: string | Date;
     genero?: string;
@@ -62,8 +62,7 @@ export default function ConsultasPage() {
   const [selectedVisit, setSelectedVisit] = useState<VisitorFromAPI | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
-
-  const handleSearch = async () => {
+  const handleSearch = async () => { /* ... (sin cambios) ... */ 
     setIsLoading(true);
     setHasSearched(true);
     try {
@@ -82,7 +81,6 @@ export default function ConsultasPage() {
         throw new Error(errorData.message || 'Error al buscar visitas');
       }
       let data: VisitorFromAPI[] = await response.json();
-      // No es necesario convertir fechas aquí si la API las devuelve como string ISO y las formateamos al mostrar
       setSearchResults(data);
 
       if (data.length === 0) {
@@ -98,7 +96,7 @@ export default function ConsultasPage() {
     }
   };
 
-  const handleExport = (formatType: "Excel" | "PDF") => {
+  const handleExport = (formatType: "Excel" | "PDF") => { /* ... (sin cambios) ... */ 
     toast({
       title: `Exportar a ${formatType} (Simulado)`,
       description: `La funcionalidad de exportar a ${formatType} aún no está implementada. Se exportarían ${searchResults.length} registros.`,
@@ -110,22 +108,23 @@ export default function ConsultasPage() {
     setIsDetailDialogOpen(true);
   };
 
-  const formatDate = (dateString?: string | Date | null, includeTime = true) => {
+  const formatDate = (dateString?: string | Date | null, includeTime = true) => { /* ... (sin cambios) ... */ 
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
+    // Verificar si la fecha es válida antes de formatear
+    if (isNaN(date.getTime())) return 'Fecha Inválida';
     return format(date, includeTime ? "Pp" : "P", { locale: es });
   };
 
-
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
+      {/* ... (Sección de Filtros sin cambios) ... */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold flex items-center">
           <History className="mr-3 h-8 w-8 text-primary" />
           Consultas de Visitas Pasadas
         </h1>
       </div>
-
       <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Filtros de Búsqueda</CardTitle>
@@ -144,7 +143,6 @@ export default function ConsultasPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
             <div className="space-y-1">
               <Label htmlFor="date-range">Rango de Fechas</Label>
               <Popover>
@@ -185,7 +183,6 @@ export default function ConsultasPage() {
                 </PopoverContent>
               </Popover>
             </div>
-
             <Button onClick={handleSearch} className="lg:self-end" disabled={isLoading}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Search className="mr-2 h-4 w-4" />}
               Buscar Visitas
@@ -194,6 +191,7 @@ export default function ConsultasPage() {
         </CardContent>
       </Card>
 
+      {/* ... (Tabla de Resultados sin cambios en la estructura principal, solo en cómo se obtiene la foto dentro del Dialog) ... */}
       <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -267,53 +265,77 @@ export default function ConsultasPage() {
         </CardContent>
       </Card>
 
+
+      {/* DIALOGO DE DETALLES DE VISITA - MODIFICADO PARA USAR photoFilename */}
       {selectedVisit && (
         <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-2xl"> {/* Considera sm:max-w-3xl o 4xl si es mucho contenido */}
             <DialogHeader>
               <DialogTitle>Detalles de la Visita</DialogTitle>
               <DialogDescription>
                 Información completa de la visita de {selectedVisit.nombres} {selectedVisit.apellidos}.
               </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="max-h-[60vh] p-1 pr-4">
+            <ScrollArea className="max-h-[60vh] md:max-h-[70vh] p-1 pr-4"> {/* Ajuste de altura */}
             <div className="space-y-4 py-2">
-              {selectedVisit.photoDataUri && (
-                <div className="flex justify-center mb-4">
-                  <Image src={selectedVisit.photoDataUri} alt="Foto Visitante" width={128} height={128} className="rounded-md border object-cover aspect-square" data-ai-hint="person portrait" />
-                </div>
-              )}
-              {!selectedVisit.photoDataUri && (
-                <div className="flex justify-center mb-4">
-                   <UserSquare2 className="w-32 h-32 text-muted-foreground bg-muted p-4 rounded-md border" />
-                </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <p><strong>Nombre Completo:</strong> {selectedVisit.nombres} {selectedVisit.apellidos}</p>
-                <p><strong>Documento:</strong> {selectedVisit.tipodocumento} {selectedVisit.numerodocumento}</p>
-                <p><strong>Teléfono:</strong> {selectedVisit.telefono || 'N/A'}</p>
-                <p><strong>Fecha Nac.:</strong> {formatDate(selectedVisit.fechanacimiento, false)}</p>
-                <p><strong>Género:</strong> {selectedVisit.genero || 'N/A'}</p>
-                <p><strong>RH:</strong> {selectedVisit.rh || 'N/A'}</p>
-                <p><strong>Empresa Origen:</strong> {selectedVisit.empresaProviene || 'N/A'}</p>
-                <p><strong>Carnet Empresa:</strong> {selectedVisit.numerocarnet || 'N/A'}</p>
-                <p><strong>Placa Vehículo:</strong> {selectedVisit.vehiculoPlaca || 'N/A'}</p>
-                <p><strong>Persona Visitada:</strong> {selectedVisit.personavisitada?.nombreApellido || 'N/A'}</p>
-                <p><strong>Propósito:</strong> {selectedVisit.purpose}</p>
-                <p><strong>Categoría:</strong> {selectedVisit.category || 'N/A'}</p>
-                <p><strong>Tipo de Visita:</strong> {selectedVisit.tipovisita || 'N/A'}</p>
-                <p><strong>Hora Entrada:</strong> {formatDate(selectedVisit.horaentrada)}</p>
-                <p><strong>Hora Salida:</strong> {formatDate(selectedVisit.horasalida) || (selectedVisit.estado === 'activa' ? 'Visita Activa' : 'N/A')}</p>
-                <p><strong>Estado:</strong> <Badge variant={selectedVisit.estado === 'activa' ? 'default' : 'secondary'}>{selectedVisit.estado === 'activa' ? 'Activa' : 'Finalizada'}</Badge></p>
-                <p><strong>ARL:</strong> {selectedVisit.arl || 'N/A'}</p>
-                <p><strong>EPS:</strong> {selectedVisit.eps || 'N/A'}</p>
-                <p><strong>Contacto Emergencia:</strong> {selectedVisit.contactoemergencianombre} {selectedVisit.contactoemergenciaapellido}</p>
-                <p><strong>Tel. Emergencia:</strong> {selectedVisit.contactoemergenciatelefono}</p>
-                <p><strong>Parentesco Emergencia:</strong> {selectedVisit.contactoemergenciaparentesco}</p>
+              {/* MODIFICADO: Lógica para mostrar la imagen desde photoFilename */}
+              <div className="flex justify-center mb-4">
+                {selectedVisit.photoFilename ? (
+                  <Image 
+                    src={`/api/images/visitors/${selectedVisit.photoFilename}`} 
+                    alt={`Foto de ${selectedVisit.nombres} ${selectedVisit.apellidos}`}
+                    width={150} // Ajusta según diseño
+                    height={150}
+                    className="rounded-md border object-cover aspect-square"
+                    // Opcional: loader si es necesario para rutas de API, o unoptimized
+                    // unoptimized={true} // Si tienes problemas con el optimizador de Next para esta ruta de API
+                    onError={(e) => {
+                      // En caso de error al cargar la imagen del API (ej. archivo no encontrado en servidor)
+                      (e.target as HTMLImageElement).style.display = 'none'; // Ocultar imagen rota
+                      // Podrías mostrar un placeholder aquí si ocultar no es suficiente
+                       const placeholder = document.getElementById(`placeholder-img-${selectedVisit.id}`);
+                       if(placeholder) placeholder.style.display = 'flex';
+                    }}
+                  />
+                ) : (
+                  <div id={`placeholder-img-${selectedVisit.id}`} className="w-[150px] h-[150px] bg-muted rounded-md flex items-center justify-center border">
+                     <UserSquare2 className="w-24 h-24 text-muted-foreground" />
+                  </div>
+                )}
+                 {/* Placeholder alternativo si la imagen principal falla, inicialmente oculto */}
+                 {selectedVisit.photoFilename && (
+                    <div id={`placeholder-img-${selectedVisit.id}`} style={{display: 'none'}} className="w-[150px] h-[150px] bg-muted rounded-md flex items-center justify-center border">
+                        <UserSquare2 className="w-24 h-24 text-muted-foreground" />
+                    </div>
+                 )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm p-2"> {/* Aumentado gap y padding */}
+                <div><Label className="font-semibold">Nombre Completo:</Label> <p>{selectedVisit.nombres} {selectedVisit.apellidos}</p></div>
+                <div><Label className="font-semibold">Documento:</Label> <p>{selectedVisit.tipodocumento} {selectedVisit.numerodocumento}</p></div>
+                <div><Label className="font-semibold">Teléfono:</Label> <p>{selectedVisit.telefono || 'N/A'}</p></div>
+                <div><Label className="font-semibold">Fecha Nac.:</Label> <p>{formatDate(selectedVisit.fechanacimiento, false)}</p></div>
+                <div><Label className="font-semibold">Género:</Label> <p>{selectedVisit.genero || 'N/A'}</p></div>
+                <div><Label className="font-semibold">RH:</Label> <p>{selectedVisit.rh || 'N/A'}</p></div>
+                <div className="md:col-span-2"><Label className="font-semibold">Empresa Origen:</Label> <p>{selectedVisit.empresaProviene || 'N/A'}</p></div>
+                <div><Label className="font-semibold">ID Interno:</Label> <p>{selectedVisit.numerocarnet || 'N/A'}</p></div>
+                <div><Label className="font-semibold">Placa Vehículo:</Label> <p>{selectedVisit.vehiculoPlaca || 'N/A'}</p></div>
+                <div className="md:col-span-2"><Label className="font-semibold">Persona Visitada:</Label> <p>{selectedVisit.personavisitada?.nombreApellido || 'N/A'}</p></div>
+                <div className="md:col-span-2"><Label className="font-semibold">Propósito:</Label> <p className="whitespace-pre-wrap">{selectedVisit.purpose}</p></div>
+                <div><Label className="font-semibold">Categoría:</Label> <p>{selectedVisit.category || 'N/A'}</p></div>
+                <div><Label className="font-semibold">Tipo de Visita:</Label> <p>{selectedVisit.tipovisita || 'N/A'}</p></div>
+                <div><Label className="font-semibold">Hora Entrada:</Label> <p>{formatDate(selectedVisit.horaentrada)}</p></div>
+                <div><Label className="font-semibold">Hora Salida:</Label> <p>{formatDate(selectedVisit.horasalida) || (selectedVisit.estado === 'activa' ? <Badge variant="outline">Visita Activa</Badge> : 'N/A')}</p></div>
+                <div><Label className="font-semibold">Estado:</Label> <p><Badge variant={selectedVisit.estado === 'activa' ? 'default' : 'secondary'}>{selectedVisit.estado === 'activa' ? 'Activa' : 'Finalizada'}</Badge></p></div>
+                <div><Label className="font-semibold">ARL:</Label> <p>{selectedVisit.arl || 'N/A'}</p></div>
+                <div><Label className="font-semibold">EPS:</Label> <p>{selectedVisit.eps || 'N/A'}</p></div>
+                <div className="md:col-span-2"><Label className="font-semibold">Contacto Emergencia:</Label> <p>{selectedVisit.contactoemergencianombre} {selectedVisit.contactoemergenciaapellido}</p></div>
+                <div><Label className="font-semibold">Tel. Emergencia:</Label> <p>{selectedVisit.contactoemergenciatelefono}</p></div>
+                <div><Label className="font-semibold">Parentesco Emergencia:</Label> <p>{selectedVisit.contactoemergenciaparentesco}</p></div>
               </div>
             </div>
             </ScrollArea>
-            <DialogFooter>
+            <DialogFooter className="pt-4"> {/* Añadido pt-4 */}
               <DialogClose asChild>
                 <Button type="button">Cerrar</Button>
               </DialogClose>
