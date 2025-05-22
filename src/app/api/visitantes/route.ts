@@ -1,4 +1,3 @@
-
 // src/app/api/visitantes/route.ts
 import { type NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -11,19 +10,20 @@ const visitanteCreateSchema = z.object({
   nombres: z.string().min(2, "Nombres son requeridos."),
   apellidos: z.string().min(2, "Apellidos son requeridos."),
   genero: z.string().min(1, "Género es requerido."),
-  fechanacimiento: z.string().transform((val) => new Date(val)), // El frontend enviará string, convertir a Date
+  fechanacimiento: z.string().transform((val) => new Date(val)),
   rh: z.string().min(1, "RH es requerido."),
   telefono: z.string().regex(/^\+?[0-9\s-()]{7,20}$/, "Teléfono inválido."),
   
-  personavisitadaId: z.string().cuid({ message: "ID de persona visitada inválido." }).optional().nullable(), // ID del empleado
+  personavisitadaId: z.string().cuid({ message: "ID de persona visitada inválido." }).optional().nullable(),
   purpose: z.string().min(5, "Propósito de la visita es requerido."),
-  category: z.string().optional(),
+  // MODIFICADO: Hacer 'category' opcional y nulable
+  category: z.string().optional().nullable(), 
   tipovisita: z.string().min(1, "Tipo de visita es requerido."),
   
-  empresaProviene: z.string().optional(),
-  numerocarnet: z.string().optional(),
-  vehiculoPlaca: z.string().optional(),
-  photoDataUri: z.string().optional(), // @db.Text ya lo maneja Prisma
+  empresaProviene: z.string().optional().nullable(), // MODIFICADO: .nullable()
+  numerocarnet: z.string().optional().nullable(),   // MODIFICADO: .nullable()
+  vehiculoPlaca: z.string().optional().nullable(),  // MODIFICADO: .nullable()
+  photoDataUri: z.string().optional().nullable(),   // MODIFICADO: .nullable()
   
   arl: z.string().min(2, "ARL es requerida."),
   eps: z.string().min(2, "EPS es requerida."),
@@ -32,15 +32,14 @@ const visitanteCreateSchema = z.object({
   contactoemergenciaapellido: z.string().min(2, "Apellido de contacto de emergencia requerido."),
   contactoemergenciatelefono: z.string().regex(/^\+?[0-9\s-()]{7,20}$/, "Teléfono de emergencia inválido."),
   contactoemergenciaparentesco: z.string().min(2, "Parentesco de contacto de emergencia requerido."),
-  // registradoPorId: z.string().cuid().optional(), // Se obtendría del usuario autenticado
 });
 
 // GET /api/visitantes - Obtener visitantes
 export async function GET(request: NextRequest) {
+  // ... (sin cambios en GET por ahora)
   const { searchParams } = new URL(request.url);
   const estado = searchParams.get('estado') as EstadoVisita | null;
   const searchTerm = searchParams.get('search');
-  // TODO: Añadir más filtros como rango de fechas, personaVisitadaId, etc.
 
   try {
     const whereClause: any = {};
@@ -63,7 +62,6 @@ export async function GET(request: NextRequest) {
       },
       include: {
         personavisitada: { select: { nombreApellido: true } },
-        // registradoPor: { select: { empleado: { select: { nombreApellido: true } } } }, // Si se implementa registradoPorId
       }
     });
     return NextResponse.json(visitantes);
@@ -79,7 +77,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = visitanteCreateSchema.parse(body);
 
-    // Validar que personavisitadaId (si se provee) exista
     if (validatedData.personavisitadaId) {
       const empleadoAnfitrion = await prisma.empleado.findUnique({
         where: { id: validatedData.personavisitadaId }
@@ -89,18 +86,28 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // TODO: Obtener `registradoPorId` del usuario autenticado en la sesión/token
-    // const registradoPorId = ...; 
-
     const nuevaVisita = await prisma.visitante.create({
       data: {
         ...validatedData,
-        // photoDataUri es opcional y se maneja por el spread
-        estado: EstadoVisita.activa, // Estado inicial al registrar
-        // horaentrada se establece por defecto en el schema.prisma con @default(now())
-        // registradoPorId: registradoPorId, 
+        // Asegurar que los campos opcionales que pueden ser null o string vacío se manejen bien
+        // Si Prisma espera `null` para opcionales no provistos y Zod los pasa como `undefined` o `""`,
+        // podrías necesitar una transformación aquí. Pero con `.optional().nullable()` en Zod,
+        // y si el campo en Prisma es `String?`, `null` debería estar bien.
+        // Si el campo en Prisma es `String` pero opcional en el create (no tiene default),
+        // `undefined` es lo correcto para que Prisma no intente insertarlo.
+        // Zod `.optional()` produce `undefined` si no está. `.nullable()` permite `null`.
+        // Para que coincida con el schema de Prisma `String?` (que puede ser string o null),
+        // el payload debería enviar `null` si no hay valor, o el string si lo hay.
+        // El schema del frontend ya lo hace con `category: null`
+        empresaProviene: validatedData.empresaProviene || null,
+        numerocarnet: validatedData.numerocarnet || null,
+        vehiculoPlaca: validatedData.vehiculoPlaca || null,
+        photoDataUri: validatedData.photoDataUri || null,
+        category: validatedData.category || null, // Asegurar que se envíe null si es undefined
+
+        estado: EstadoVisita.activa,
       },
-      include: { // Para devolver datos útiles en la respuesta
+      include: { 
         personavisitada: { select: { nombreApellido: true } }
       }
     });
@@ -109,9 +116,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('API Error POST /api/visitantes:', error);
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: 'Datos de entrada inválidos', errors: error.errors }, { status: 400 });
+      return NextResponse.json({ message: 'Datos de entrada inválidos.', errors: error.errors }, { status: 400 });
     }
     return NextResponse.json({ message: 'Error al registrar la visita', error: (error as Error).message }, { status: 500 });
   }
 }
-  

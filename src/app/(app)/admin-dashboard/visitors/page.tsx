@@ -17,7 +17,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { notify } from "@/components/layout/app-header";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface EmployeeOption {
   value: string; 
@@ -50,12 +49,10 @@ export default function VisitorsPage() {
   const [autoregisterEnabled, setAutoregisterEnabled] = useState(true); 
   const [autoregisterUrl, setAutoregisterUrl] = useState("");
   
-  // Estado para las opciones del combobox de empleados
   const [employeeComboboxOptions, setEmployeeComboboxOptions] = useState<EmployeeOption[]>([]);
   const [isLoadingEmployeesOptions, setIsLoadingEmployeesOptions] = useState(true);
 
-
-  const fetchActiveVisitors = async () => {
+  const fetchActiveVisitors = async () => { /* ... (sin cambios) ... */ 
     setIsLoadingVisitors(true);
     try {
       const response = await fetch('/api/visitantes?estado=activa');
@@ -75,21 +72,21 @@ export default function VisitorsPage() {
     }
   };
 
-  const fetchEmployeesForCombobox = async () => {
+  const fetchEmployeesForCombobox = async () => { /* ... (sin cambios) ... */ 
     setIsLoadingEmployeesOptions(true);
     try {
-      const response = await fetch('/api/empleados?activo=true'); // Solo empleados activos
+      const response = await fetch('/api/empleados?activo=true'); 
       if (!response.ok) throw new Error('Error al cargar empleados anfitriones');
       const employees: {id: string, nombreApellido: string, identificacion: string}[] = await response.json();
       setEmployeeComboboxOptions(
         employees.map(emp => ({
-          value: emp.id, // El ID del empleado
+          value: emp.id, 
           label: `${emp.nombreApellido} (ID: ${emp.identificacion})`,
         }))
       );
     } catch (error) {
       toast({ variant: "destructive", title: "Error de Carga", description: "No se pudieron cargar los empleados para el selector." });
-      setEmployeeComboboxOptions([]); // Asegurar que sea un array vacío en caso de error
+      setEmployeeComboboxOptions([]); 
     } finally {
       setIsLoadingEmployeesOptions(false);
     }
@@ -97,12 +94,11 @@ export default function VisitorsPage() {
 
   useEffect(() => {
     fetchActiveVisitors();
-    fetchEmployeesForCombobox(); // Cargar empleados cuando el componente monta
+    fetchEmployeesForCombobox();
     if (typeof window !== 'undefined') {
       setAutoregisterUrl(`${window.location.origin}/autoregistro`);
     }
   }, []);
-
 
   const handleFormSubmitSuccess = (data: FullVisitorFormData) => {
     console.log("Visita registrada desde VisitorsPage:", data);
@@ -110,7 +106,7 @@ export default function VisitorsPage() {
     setIsRegisterDialogOpen(false);
   };
   
-  const handleMarkExit = async (visitorId: string) => {
+  const handleMarkExit = async (visitorId: string) => { /* ... (sin cambios) ... */ 
     const visitor = visitorEntries.find(v => v.id === visitorId);
     if (!visitor) return;
 
@@ -139,11 +135,11 @@ export default function VisitorsPage() {
     }
   };
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => { /* ... (sin cambios) ... */ 
     setSearchTerm(event.target.value.toLowerCase());
   };
 
-  const filteredActiveVisitors = useMemo(() => {
+  const filteredActiveVisitors = useMemo(() => { /* ... (sin cambios) ... */ 
     if (!searchTerm) return visitorEntries.filter(v => v.estado === 'activa');
     return visitorEntries.filter(
       v => v.estado === 'activa' && (
@@ -153,7 +149,6 @@ export default function VisitorsPage() {
       )
     );
   }, [visitorEntries, searchTerm]);
-
 
   return (
     <div className="w-full flex flex-col flex-1 space-y-6">
@@ -170,15 +165,16 @@ export default function VisitorsPage() {
                 Registrar Visita
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
-              <DialogHeader>
+            {/* MODIFICADO: DialogContent ahora tiene p-0 y el formulario maneja su propio padding y scroll */}
+            <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0"> 
+              <DialogHeader className="p-6 pb-4 border-b sticky top-0 bg-background z-10"> {/* Header pegajoso */}
                 <DialogTitle>Registrar Nueva Visita</DialogTitle>
                 <DialogDescription>
                   Complete todos los campos para registrar al visitante.
                 </DialogDescription>
               </DialogHeader>
-              {/* Renderizar VisitorRegistrationForm aquí y pasarle las props necesarias */}
-              {isRegisterDialogOpen && !isLoadingEmployeesOptions && ( // Solo renderizar si el diálogo está abierto y las opciones cargadas
+              {/* El contenido del formulario (VisitorRegistrationForm) se renderiza aquí */}
+              {isRegisterDialogOpen && !isLoadingEmployeesOptions && (
                 <VisitorRegistrationForm 
                   isAutoregistro={false} 
                   onSubmitSuccess={handleFormSubmitSuccess}
@@ -186,17 +182,17 @@ export default function VisitorsPage() {
                 />
               )}
               {isLoadingEmployeesOptions && isRegisterDialogOpen && (
-                <div className="flex-grow flex items-center justify-center">
+                <div className="flex-grow flex items-center justify-center p-6">
                     <Loader2 className="h-6 w-6 animate-spin text-primary"/>
                     <p className="ml-2">Cargando datos del formulario...</p>
                 </div>
               )}
-               {/* El DialogFooter ahora está dentro de VisitorRegistrationForm */}
+              {/* El DialogFooter ahora está DENTRO de VisitorRegistrationForm */}
             </DialogContent>
           </Dialog>
 
-          {/* Dialogo de Autoregistro */}
-          {currentUserCanManageAutoregister && (
+          {/* ... (Dialogo de Autoregistro sin cambios aquí) ... */}
+           {currentUserCanManageAutoregister && (
             <Dialog open={isAutoregisterDialogOpen} onOpenChange={setIsAutoregisterDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -273,6 +269,7 @@ export default function VisitorsPage() {
         </div>
       </div>
 
+      {/* ... (Card y Tabla de Visitantes Activos sin cambios aquí) ... */}
       <Card className="shadow-lg flex flex-col flex-1 w-full">
         <CardHeader>
           <CardTitle>Visitantes Activos</CardTitle>
