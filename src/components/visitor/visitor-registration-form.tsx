@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-// CardHeader, CardTitle, CardDescription, CardFooter ya no se usan directamente aquí para el layout principal
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"; // Card se usa para secciones internas
-import { DialogFooter, DialogClose } from "@/components/ui/dialog"; // Importar DialogFooter y DialogClose
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Lightbulb, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +45,8 @@ export const baseVisitorSchema = z.object({
   tipovisita: z.string().min(1, "Tipo de visita es requerido."),
   
   empresaProviene: z.string().max(100, "Máximo 100 caracteres.").optional().nullable(),
-  numerocarnet: z.string().max(50, "Máximo 50 caracteres.").optional().nullable(),
+  // MODIFICADO: Schema simple para numerocarnet (ID Interno)
+  numerocarnet: z.string().optional().nullable(), 
   vehiculoPlaca: z.string().max(10, "Máximo 10 caracteres.").optional().nullable(),
 
   arl: z.string().min(1, "ARL es requerida."),
@@ -70,6 +70,9 @@ const REQUIRED_LIST_TYPES: ManagedListType[] = [
   "PARENTESCOS_CONTACTO_EMERGENCIA",
 ];
 
+// Opciones para ID Interno (lista fija)
+const idInternoOptions = Array.from({ length: 20 }, (_, i) => String(i + 1));
+
 export interface VisitorRegistrationFormPassedProps { 
     isAutoregistro?: boolean;
     onSubmitSuccess?: (data: FullVisitorFormData) => void;
@@ -92,13 +95,14 @@ export default function VisitorRegistrationForm({
 
   const methods = useForm<FullVisitorFormData>({
     resolver: zodResolver(baseVisitorSchema),
-    defaultValues: { /* ... (tus defaultValues completos) ... */
+    defaultValues: {
         tipodocumento: "", numerodocumento: "", nombres: "", apellidos: "",
         genero: "", fechanacimiento: undefined, rh: "", telefono: "",
         photoDataUri: null, personavisitadaId: null, purpose: "", category: null,
-        tipovisita: "", empresaProviene: "", numerocarnet: "", vehiculoPlaca: "",
-        arl: "", eps: "", contactoemergencianombre: "", contactoemergenciaapellido: "",
-        contactoemergenciatelefono: "", contactoemergenciaparentesco: "",
+        tipovisita: "", empresaProviene: "", numerocarnet: null, 
+        vehiculoPlaca: "", arl: "", eps: "", contactoemergencianombre: "", 
+        contactoemergenciaapellido: "", contactoemergenciatelefono: "", 
+        contactoemergenciaparentesco: "",
     }
   });
   const { handleSubmit, setValue, watch, reset } = methods;
@@ -175,10 +179,20 @@ export default function VisitorRegistrationForm({
     setIsSubmitting(true);
     console.log("Full Visitor Data to Submit:", data);
     try {
+      const payload = {
+        ...data,
+        numerocarnet: data.numerocarnet === "" ? null : data.numerocarnet,
+        empresaProviene: data.empresaProviene === "" ? null : data.empresaProviene,
+        vehiculoPlaca: data.vehiculoPlaca === "" ? null : data.vehiculoPlaca,
+        category: data.category === "" ? null : data.category,
+        photoDataUri: data.photoDataUri === "" ? null : data.photoDataUri,
+        personavisitadaId: data.personavisitadaId === "" ? null : data.personavisitadaId,
+      };
+
       const endpoint = isAutoregistro ? '/api/visitantes/autoregister' : '/api/visitantes';
       const response = await fetch(endpoint, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
       });
       if (!response.ok) {
           const errorData = await response.json();
@@ -203,7 +217,7 @@ export default function VisitorRegistrationForm({
 
   if (isLoadingLists) {
     return (
-      <div className="flex-grow flex justify-center items-center min-h-[300px]"> {/* flex-grow para ocupar espacio */}
+      <div className="flex-grow flex justify-center items-center min-h-[300px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="ml-2">Cargando opciones del formulario...</p>
       </div>
@@ -212,7 +226,7 @@ export default function VisitorRegistrationForm({
 
   if (listLoadingError) {
     return (
-      <div className="flex-grow flex flex-col justify-center items-center min-h-[300px] text-destructive p-6"> {/* flex-grow y padding */}
+      <div className="flex-grow flex flex-col justify-center items-center min-h-[300px] text-destructive p-6">
         <AlertTriangle className="h-8 w-8 mb-2" />
         <p className="font-semibold">Error al cargar datos del formulario.</p>
         <p className="text-sm text-center mb-4">{listLoadingError}</p>
@@ -230,24 +244,20 @@ export default function VisitorRegistrationForm({
     arlOptions: loadedLists.ARLS?.map(item => item.value) || [],
     epsOptions: loadedLists.EPSS?.map(item => item.value) || [],
     parentescosOptions: loadedLists.PARENTESCOS_CONTACTO_EMERGENCIA?.map(item => item.value) || [],
+    idInternoOptions: idInternoOptions, // Pasar las opciones de ID Interno
     employeeComboboxOptions: employeeComboboxOptions,
   };
 
   return (
     <FormProvider {...methods}>
-      {/* El Card exterior ha sido removido. El DialogContent actúa como contenedor. */}
-      {/* El DialogHeader (con Title y Description) se define en el componente padre (VisitorsPage) */}
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-grow overflow-hidden"> {/* flex-grow para formulario */}
-        {/* Contenido del formulario con scroll */}
-        <div className="flex-grow overflow-y-auto p-6 space-y-0"> {/* p-6 para el contenido, space-y-0 para quitar margen entre cards */}
-          <div className="space-y-6"> {/* Contenedor interno para el espaciado entre Cards de campos */}
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-grow overflow-hidden">
+        <div className="flex-grow overflow-y-auto p-6 space-y-0">
+          <div className="space-y-6">
             <VisitorRegistrationFormFields {...formFieldsProps} />
-
-            {/* Card para Purpose y Category */}
             <Card>
                 <CardHeader><CardTitle className="text-lg">Detalles Adicionales de la Visita</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="space-y-1"> {/* Ajustado space-y-1 */}
+                    <div className="space-y-1">
                         <Label htmlFor="purpose">Propósito de la Visita</Label>
                         <Textarea
                             id="purpose"
@@ -279,7 +289,7 @@ export default function VisitorRegistrationForm({
                         )}
                         </div>
                         {watch("category") && (
-                        <div className="space-y-1"> {/* Ajustado space-y-1 */}
+                        <div className="space-y-1">
                             <Label htmlFor="categoryDisplay">Categoría Seleccionada</Label>
                             <Input id="categoryDisplay" value={watch("category") || ""} readOnly className="bg-muted/50" />
                         </div>
@@ -288,9 +298,7 @@ export default function VisitorRegistrationForm({
             </Card>
           </div>
         </div>
-        
-        {/* Footer del formulario, que ahora es un DialogFooter */}
-        <DialogFooter className="p-6 border-t mt-auto"> {/* mt-auto para empujar al fondo, border-t */}
+        <DialogFooter className="p-6 border-t mt-auto">
           <DialogClose asChild>
               <Button type="button" variant="outline" disabled={isSubmitting || isLoadingLists}>Cancelar</Button>
           </DialogClose>
