@@ -4,27 +4,22 @@ import { useFormContext } from "react-hook-form";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { FullVisitorFormData } from "./visitor-registration-form";
-import React, { useState, useRef, useEffect } from "react"; // useCallback no se usa directamente aquí
+import React, { useState, useRef, useEffect } from "react";
 import Image from 'next/image';
 
 import { Input } from "@/components/ui/input";
-// import { Textarea } from "@/components/ui/textarea"; // No se usa Textarea aquí
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // CardDescription no se usa
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox"; // Asegúrate que ComboboxOption se exporte de tu combobox.tsx
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, UserCheck, Camera, FileImage, ScanLine, UserSquare2, Info, Loader2 } from "lucide-react";
-// import { Badge } from "@/components/ui/badge"; // Badge no se usa aquí
 import { cn } from "@/lib/utils";
-// import { ScrollArea } from "../ui/scroll-area"; // ScrollArea no se usa directamente aquí, está en el padre
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-
-// Opciones para ID Interno (lista fija)
 const idInternoOptionsList = Array.from({ length: 20 }, (_, i) => String(i + 1));
 
 export interface VisitorFormFieldsProps {
@@ -35,7 +30,6 @@ export interface VisitorFormFieldsProps {
   arlOptions: string[];
   epsOptions: string[];
   parentescosOptions: string[];
-  // idInternoOptions: string[]; // Ya no se pasa como prop, se usa idInternoOptionsList
   employeeComboboxOptions: ComboboxOption[];
   showScannerSection?: boolean;
   isAutoregistro?: boolean;
@@ -49,8 +43,7 @@ export function VisitorRegistrationFormFields({
   arlOptions,
   epsOptions,
   parentescosOptions,
-  // idInternoOptions, // Se usa la lista local
-  employeeComboboxOptions,
+  employeeComboboxOptions, // En autoregistro, esto será un array vacío []
   showScannerSection = true,
   isAutoregistro = false,
 }: VisitorFormFieldsProps) {
@@ -63,17 +56,15 @@ export function VisitorRegistrationFormFields({
 
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const photoDataUriFromForm = form.watch('photoDataUri'); // Observar el valor del formulario
+  const photoDataUriFromForm = form.watch('photoDataUri');
   const [capturedPhotoDataUri, setCapturedPhotoDataUri] = useState<string | null>(photoDataUriFromForm || null);
   
   const [rawScannedDataInput, setRawScannedDataInput] = useState("");
   const [isProcessingScan, setIsProcessingScan] = useState(false);
 
-  // Sincronizar el estado local de la foto con el valor del formulario
   useEffect(() => {
     setCapturedPhotoDataUri(photoDataUriFromForm || null);
   }, [photoDataUriFromForm]);
-
 
   useEffect(() => {
     const stopCameraTracks = () => {
@@ -85,39 +76,77 @@ export function VisitorRegistrationFormFields({
     };
 
     if (isCameraOpen) {
-      const getCameraPermission = async () => {
+      const requestStreamAndPermissions = async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          setHasCameraPermission(true);
+          setHasCameraPermission(true); 
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(playError => console.error("Error playing video:", playError));
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error accessing camera:', error);
           setHasCameraPermission(false);
+          
+          let title = 'Error de Cámara';
+          let description = 'Ocurrió un problema al intentar acceder a la cámara.';
+
+          if (error.name === 'NotAllowedError') {
+            title = 'Acceso a Cámara Denegado';
+            description = 'Por favor, active los permisos de cámara en su navegador para esta función.';
+          } else if (error.name === 'NotFoundError') {
+            title = 'Cámara No Encontrada';
+            description = 'No se detectó ninguna cámara conectada. Por favor, verifique su dispositivo.';
+          } else if (error.name === 'NotReadableError') {
+            title = 'Error de Hardware';
+            description = 'La cámara no puede ser accedida, puede estar en uso por otra aplicación o haber un problema de hardware.';
+          } else if (error.name === 'AbortError') {
+            title = 'Acceso Interrumpido';
+            description = 'El acceso a la cámara fue interrumpido antes de completarse.';
+          } else if (error.name === 'SecurityError') {
+            title = 'Error de Seguridad';
+            description = 'El acceso a la cámara fue bloqueado por razones de seguridad. Asegúrese de que la página se sirva mediante HTTPS.';
+          } else if (error.name === 'TypeError') {
+            title = 'Error de API de Cámara';
+            description = 'La funcionalidad de cámara no está disponible o no es compatible (navigator.mediaDevices.getUserMedia no encontrado).';
+          }
+
           toast({
             variant: 'destructive',
-            title: 'Acceso a Cámara Denegado',
-            description: 'Por favor, active los permisos de cámara en su navegador para esta función.',
+            title: title,
+            description: description,
           });
           setIsCameraOpen(false);
         }
       };
-      getCameraPermission();
+      requestStreamAndPermissions();
     } else {
       stopCameraTracks();
     }
-    return () => {
+
+    return () => { 
       stopCameraTracks();
     };
   }, [isCameraOpen, toast]);
 
   const handleToggleCamera = () => {
+    if (!isCameraOpen) { 
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        console.error('Camera API (getUserMedia) is not available in this browser or context.');
+        setHasCameraPermission(false); 
+        toast({
+          variant: 'destructive',
+          title: 'Función de Cámara No Disponible',
+          description: 'La cámara no es compatible con este navegador, o la página no se sirve de forma segura (HTTPS).',
+        });
+        return; 
+      }
+    }
     setIsCameraOpen(prev => !prev);
   };
 
   const handleCaptureFromStream = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) { 
       const video = videoRef.current;
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
@@ -127,13 +156,14 @@ export function VisitorRegistrationFormFields({
       if (context) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUri = canvas.toDataURL('image/jpeg');
-        // setCapturedPhotoDataUri(dataUri); // El useEffect que observa photoDataUriFromForm lo hará
         form.setValue('photoDataUri', dataUri, { shouldValidate: true, shouldDirty: true });
-        setIsCameraOpen(false);
+        setIsCameraOpen(false); 
         toast({ title: "Foto Capturada", description: "La foto del visitante ha sido capturada." });
+      } else {
+        toast({ variant: "destructive", title: "Error de Contexto", description: "No se pudo obtener el contexto 2D del canvas." });
       }
     } else {
-        toast({ variant: "destructive", title: "Error de Captura", description: "No se pudo acceder a los elementos de video o canvas." });
+        toast({ variant: "destructive", title: "Error de Captura", description: "No se pudo acceder a los elementos de video/canvas o el video no está listo." });
     }
   };
   
@@ -143,7 +173,6 @@ export function VisitorRegistrationFormFields({
       const reader = new FileReader();
       reader.onloadend = () => {
         const dataUri = reader.result as string;
-        // setCapturedPhotoDataUri(dataUri); // El useEffect lo hará
         form.setValue('photoDataUri', dataUri, { shouldValidate: true, shouldDirty: true });
         toast({ title: "Foto Subida", description: "La foto del visitante ha sido seleccionada." });
       };
@@ -189,6 +218,10 @@ export function VisitorRegistrationFormFields({
     }, 1500);
   };
 
+  // CAMBIO: Determinar si el campo de anfitrión (Persona a Visitar) debe mostrarse.
+  // Se mostrará solo si NO es autoregistro Y si hay opciones de empleados disponibles.
+  const shouldShowHostField = !isAutoregistro && employeeComboboxOptions && employeeComboboxOptions.length > 0;
+
   return (
     <>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -200,14 +233,32 @@ export function VisitorRegistrationFormFields({
             <div className="w-full aspect-square bg-muted rounded-md flex items-center justify-center overflow-hidden border">
               {capturedPhotoDataUri ? (<Image src={capturedPhotoDataUri} alt="Foto del visitante" width={200} height={200} className="object-cover w-full h-full" />) : (<UserSquare2 className="w-24 h-24 text-muted-foreground" />)}
             </div>
-            {isCameraOpen && hasCameraPermission !== false && (<div className="w-full aspect-video bg-black rounded-md overflow-hidden mt-2"><video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted /></div>)}
-            {hasCameraPermission === false && !isCameraOpen && (<Alert variant="destructive" className="mt-2"><Camera className="h-4 w-4" /><AlertTitle>Error de Cámara</AlertTitle><AlertDescription>No se pudo acceder a la cámara.</AlertDescription></Alert>)}
+            {isCameraOpen && hasCameraPermission !== false && (
+              <div className="w-full aspect-video bg-black rounded-md overflow-hidden mt-2">
+                <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
+              </div>
+            )}
+            {hasCameraPermission === false && !isCameraOpen && (
+                <Alert variant="destructive" className="mt-2">
+                    <Camera className="h-4 w-4" />
+                    <AlertTitle>Error de Cámara</AlertTitle>
+                    <AlertDescription>No se pudo acceder a la cámara. Verifique los permisos o la disponibilidad del dispositivo.</AlertDescription>
+                </Alert>
+            )}
             <div className="flex flex-col sm:flex-row gap-2 mt-2">
-              <Button type="button" variant="outline" onClick={handleToggleCamera} className="flex-1"><Camera className="mr-2 h-4 w-4" /> {isCameraOpen ? "Cerrar" : "Abrir"} Cámara</Button>
-              {isCameraOpen && (<Button type="button" onClick={handleCaptureFromStream} className="flex-1">Capturar Foto</Button>)}
+              <Button type="button" variant="outline" onClick={handleToggleCamera} className="flex-1">
+                <Camera className="mr-2 h-4 w-4" /> {isCameraOpen ? "Cerrar" : "Abrir"} Cámara
+              </Button>
+              {isCameraOpen && hasCameraPermission && ( 
+                <Button type="button" onClick={handleCaptureFromStream} className="flex-1">
+                  Capturar Foto
+                </Button>
+              )}
             </div>
             <Input type="file" accept="image/*" ref={photoInputRef} onChange={handlePhotoInputChange} className="hidden" id="photo-upload-input"/>
-            <Button type="button" variant="outline" onClick={() => photoInputRef.current?.click()} className="w-full"><FileImage className="mr-2 h-4 w-4" /> Subir Foto</Button>
+            <Button type="button" variant="outline" onClick={() => photoInputRef.current?.click()} className="w-full">
+              <FileImage className="mr-2 h-4 w-4" /> Subir Foto
+            </Button>
             <FormField control={form.control} name="photoDataUri" render={({ field }) => ( <FormItem className="hidden"><FormControl><Input {...field} value={field.value || ""} /></FormControl></FormItem> )}/>
           </div>
           {showScannerSection && (
@@ -239,19 +290,20 @@ export function VisitorRegistrationFormFields({
       <Card>
         <CardHeader><CardTitle className="text-lg">Detalles de la Visita</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {!isAutoregistro && (
+          {/* CAMBIO: Renderizado condicional del campo "Persona a Visitar" */}
+          {shouldShowHostField && (
             <FormField control={form.control} name="personavisitadaId" render={({ field }) => (
                 <FormItem className="md:col-span-2"> 
                 <FormLabel>Persona a Visitar (Anfitrión)</FormLabel>
                 <Combobox
                     options={employeeComboboxOptions}
                     value={field.value || ""} 
-                    onChange={(value) => field.onChange(value === "" ? null : value)} // Enviar null si es ""
-                    getOptionLabel={(option) => (option as ComboboxOption).label} // Asegurar el tipo
-                    getOptionValue={(option) => (option as ComboboxOption).value} // Asegurar el tipo
-                    placeholder="Buscar empleado..."
+                    onChange={(value) => field.onChange(value === "" ? null : value)}
+                    getOptionLabel={(option) => (option as ComboboxOption).label}
+                    getOptionValue={(option) => (option as ComboboxOption).value}
+                    placeholder="Buscar anfitrión..." // Modificado placeholder
                     searchPlaceholder="Escriba nombre o ID..."
-                    emptyMessage="Empleado no encontrado."
+                    emptyMessage="Anfitrión no encontrado." // Modificado emptyMessage
                     disabled={field.disabled}
                     icon={<UserCheck className="mr-2 h-4 w-4 text-primary" />}
                 />
@@ -260,7 +312,8 @@ export function VisitorRegistrationFormFields({
             )}/>
           )}
           <FormField control={form.control} name="tipovisita" render={({ field }) => (
-              <FormItem className={isAutoregistro ? "md:col-span-2" : ""}>
+              // CAMBIO: El className ahora depende de si el campo de anfitrión se muestra.
+              <FormItem className={shouldShowHostField ? "" : "md:col-span-2"}>
                 <FormLabel>Tipo de Visita</FormLabel>
                 <Combobox options={tiposDeVisitaOptions} value={field.value || ""} onChange={(value) => field.onChange(value)} placeholder="Seleccione tipo" disabled={field.disabled} emptyMessage="Tipo no encontrado." searchPlaceholder="Buscar tipo..." />
                 <FormMessage />
