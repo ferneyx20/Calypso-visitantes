@@ -8,14 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // CardDescription no se usa aquí, pero lo dejo por si acaso
-import { DialogFooter, DialogClose } from "@/components/ui/dialog"; // DialogClose se usará condicionalmente
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; 
+import { DialogFooter, DialogClose } from "@/components/ui/dialog"; 
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Lightbulb, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { VisitorRegistrationFormFields, type VisitorFormFieldsProps } from "./visitor-registration-form-fields";
 import type { ManagedListItem as PrismaManagedListItem, ManagedListType } from "@prisma/client";
-import { ScrollArea } from "@/components/ui/scroll-area"; // No se usa directamente, pero está importado
+// CAMBIO: ScrollArea no se usa aquí directamente, se eliminó el import si no es necesario en este nivel.
+// import { ScrollArea } from "@/components/ui/scroll-area"; 
+import type { ComboboxOption } from "@/components/ui/combobox"; // Asegurarse que ComboboxOption esté disponible
 
 const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -39,7 +41,11 @@ export const baseVisitorSchema = z.object({
   telefono: z.string().min(7, "Teléfono debe tener al menos 7 dígitos.").max(20, "Máximo 20 caracteres.").regex(/^\+?[0-9\s-()]+$/, { message: "Número de teléfono inválido." }),
   photoDataUri: z.string().optional().nullable(),
 
-  personavisitadaId: z.string().optional().nullable(), // Permitir que sea opcional para autorregistro si es necesario.
+  // CAMBIO: Añadido sedeId. Asumimos que es requerido para autorregistro.
+  // Si puede ser opcional en algunos casos, ajusta la validación (ej. .optional().nullable())
+  sedeId: z.string().min(1, "Debe seleccionar una sede."),
+
+  personavisitadaId: z.string().optional().nullable(), 
   purpose: z.string().min(5, "El propósito debe tener al menos 5 caracteres.").max(500, "Máximo 500 caracteres."),
   category: z.string().optional().nullable(),
   tipovisita: z.string().min(1, "Tipo de visita es requerido."),
@@ -64,22 +70,25 @@ const REQUIRED_LIST_TYPES: ManagedListType[] = [
   "ARLS", "EPSS", "PARENTESCOS_CONTACTO_EMERGENCIA",
 ];
 
-const idInternoOptions = Array.from({ length: 20 }, (_, i) => String(i + 1));
+// idInternoOptions ya no se define/usa aquí, se maneja en VisitorRegistrationFormFields si es local a ese componente.
+// const idInternoOptions = Array.from({ length: 20 }, (_, i) => String(i + 1));
 
 export interface VisitorRegistrationFormPassedProps { 
     isAutoregistro?: boolean;
     onSubmitSuccess?: (data: FullVisitorFormData) => void;
-    onCancel?: () => void; // NUEVA PROP: para manejar la cancelación fuera de un diálogo
-    isInDialogContext?: boolean; // NUEVA PROP: para saber si estamos en un diálogo
-    employeeComboboxOptions?: { value: string; label: string }[];
+    onCancel?: () => void; 
+    isInDialogContext?: boolean; 
+    employeeComboboxOptions?: ComboboxOption[];
+    sedeOptions?: ComboboxOption[]; // CAMBIO: Añadida prop para opciones de sede
 }
 
 export default function VisitorRegistrationForm({ 
     isAutoregistro = false,
     onSubmitSuccess,
-    onCancel, // Recibir onCancel
-    isInDialogContext = true, // Por defecto, asumimos que está en un diálogo
+    onCancel, 
+    isInDialogContext = true, 
     employeeComboboxOptions = [],
+    sedeOptions = [], // CAMBIO: Recibir sedeOptions, con valor por defecto array vacío
  }: VisitorRegistrationFormPassedProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,13 +101,37 @@ export default function VisitorRegistrationForm({
 
   const methods = useForm<FullVisitorFormData>({
     resolver: zodResolver(baseVisitorSchema),
-    defaultValues: { /* ... tus valores por defecto ... */ }
+    // CAMBIO: Añadir sedeId a defaultValues
+    defaultValues: {
+        tipodocumento: "",
+        numerodocumento: "",
+        nombres: "",
+        apellidos: "",
+        genero: "",
+        fechanacimiento: undefined, // O null si prefieres
+        rh: "",
+        telefono: "",
+        photoDataUri: null,
+        sedeId: "", // Valor inicial para sedeId
+        personavisitadaId: null,
+        purpose: "",
+        category: null,
+        tipovisita: "",
+        empresaProviene: "",
+        numerocarnet: null, 
+        vehiculoPlaca: "",
+        arl: "",
+        eps: "",
+        contactoemergencianombre: "",
+        contactoemergenciaapellido: "",
+        contactoemergenciatelefono: "",
+        contactoemergenciaparentesco: "",
+    }
   });
   const { handleSubmit, setValue, watch, reset, formState: { errors } } = methods;
   const purposeValue = watch("purpose");
 
   useEffect(() => {
-    // ... (lógica de fetchAllLists sin cambios)
     async function fetchAllLists() {
       setIsLoadingLists(true);
       setListLoadingError(null);
@@ -108,8 +141,8 @@ export default function VisitorRegistrationForm({
             if (!res.ok) {
                 return res.json().then(errorData => {
                     throw new Error(errorData.message || `Error cargando ${listType} (Status: ${res.status})`);
-                }).catch(() => {
-                    throw new Error(`Error cargando ${listType} (Status: ${res.status})`);
+                }).catch(() => { // Fallback si res.json() también falla
+                    throw new Error(`Error cargando ${listType} (Status: ${res.status}, no se pudo leer el cuerpo del error)`);
                 });
             }
             return res.json();
@@ -134,7 +167,6 @@ export default function VisitorRegistrationForm({
   }, [toast]);
 
   const fetchCategorySuggestion = useCallback(async (purposeText: string) => {
-    // ... (lógica de fetchCategorySuggestion sin cambios)
     if (purposeText.trim().length < 10) { 
       setSuggestedCategory(null); setValue("category", null); return;
     }
@@ -162,24 +194,26 @@ export default function VisitorRegistrationForm({
   const debouncedFetchCategory = useCallback(debounce(fetchCategorySuggestion, 750), [fetchCategorySuggestion]);
 
   useEffect(() => {
-    // ... (lógica de useEffect para purposeValue sin cambios)
      if (purposeValue) { debouncedFetchCategory(purposeValue); } 
     else { setSuggestedCategory(null); setValue("category", null); }
   }, [purposeValue, debouncedFetchCategory, setValue]);
 
   const onSubmit: SubmitHandler<FullVisitorFormData> = async (data) => {
-    // ... (lógica de onSubmit sin cambios)
     setIsSubmitting(true);
-    console.log("Full Visitor Data to Submit:", data);
+    // Log para verificar que sedeId se está incluyendo con el valor correcto
+    console.log("Full Visitor Data to Submit:", data); 
     try {
+      // Asegurar que todos los campos opcionales que son strings vacíos se envíen como null
+      // y que sedeId (si es opcional y no se llena) también se maneje apropiadamente.
       const payload = {
         ...data,
-        numerocarnet: data.numerocarnet === "" ? null : data.numerocarnet,
-        empresaProviene: data.empresaProviene === "" ? null : data.empresaProviene,
-        vehiculoPlaca: data.vehiculoPlaca === "" ? null : data.vehiculoPlaca,
-        category: data.category === "" ? null : data.category,
-        photoDataUri: data.photoDataUri === "" ? null : data.photoDataUri,
-        personavisitadaId: data.personavisitadaId === "" ? null : data.personavisitadaId,
+        sedeId: data.sedeId || null, // CAMBIO: Asegurar que sedeId se envíe correctamente. Si es siempre requerido, no necesita "|| null".
+        numerocarnet: data.numerocarnet || null,
+        empresaProviene: data.empresaProviene || null,
+        vehiculoPlaca: data.vehiculoPlaca || null,
+        category: data.category || null,
+        photoDataUri: data.photoDataUri || null,
+        personavisitadaId: data.personavisitadaId || null,
       };
 
       const endpoint = isAutoregistro ? '/api/visitantes/autoregister' : '/api/visitantes';
@@ -202,7 +236,6 @@ export default function VisitorRegistrationForm({
   };
 
   const handleSuggestionClick = () => {
-    // ... (lógica de handleSuggestionClick sin cambios)
     if (suggestedCategory) {
       setValue("category", suggestedCategory, { shouldValidate: true });
       toast({ title: "Categoría Aplicada", description: `Se aplicó la categoría "${suggestedCategory}".`});
@@ -210,15 +243,13 @@ export default function VisitorRegistrationForm({
   };
 
   const handleCancelClick = () => {
-    reset(); // Limpiar el formulario
+    reset(); 
     setSuggestedCategory(null);
     if (onCancel) {
-      onCancel(); // Llamar a la función onCancel si se proporcionó (para cerrar modal, etc.)
+      onCancel(); 
     }
-    // Si no está en un diálogo y no hay onCancel, el reset es la acción principal.
   };
 
-  // ... (lógica de isLoadingLists y listLoadingError sin cambios)
    if (isLoadingLists) {
     return (
       <div className="flex-grow flex justify-center items-center min-h-[300px]">
@@ -241,7 +272,7 @@ export default function VisitorRegistrationForm({
   
   const formFieldsProps: VisitorFormFieldsProps = {
     isAutoregistro,
-    showScannerSection: !isAutoregistro, // Ocultar sección de scanner si es autoregistro
+    showScannerSection: !isAutoregistro, 
     tiposDeDocumentoOptions: loadedLists.TIPOS_DE_DOCUMENTO?.map(item => item.value) || [],
     generosOptions: loadedLists.GENEROS?.map(item => item.value) || [],
     factoresRHOptions: loadedLists.FACTORES_RH?.map(item => item.value) || [],
@@ -249,15 +280,14 @@ export default function VisitorRegistrationForm({
     arlOptions: loadedLists.ARLS?.map(item => item.value) || [],
     epsOptions: loadedLists.EPSS?.map(item => item.value) || [],
     parentescosOptions: loadedLists.PARENTESCOS_CONTACTO_EMERGENCIA?.map(item => item.value) || [],
-    // idInternoOptions: idInternoOptions, // Esto ahora se maneja dentro de VisitorRegistrationFormFields
     employeeComboboxOptions: employeeComboboxOptions,
+    sedeOptions: sedeOptions, // CAMBIO: Pasar sedeOptions a VisitorRegistrationFormFields
   };
 
   return (
     <FormProvider {...methods}>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-grow overflow-hidden">
-        {/* MODIFICADO: Quitar ScrollArea de aquí si VisitorRegistrationFormFields maneja su propio scroll o si la página padre lo hace */}
-        <div className="flex-grow overflow-y-auto p-6 space-y-0"> {/* El padding y scroll está aquí */}
+        <div className="flex-grow overflow-y-auto p-6 space-y-0"> 
           <div className="space-y-6">
             <VisitorRegistrationFormFields {...formFieldsProps} />
             <Card>
@@ -304,8 +334,7 @@ export default function VisitorRegistrationForm({
             </Card>
           </div>
         </div>
-        {/* MODIFICADO: El footer del diálogo ahora es más flexible */}
-        <div className="p-6 border-t mt-auto bg-background sticky bottom-0"> {/* Aplicar clase bg-background si es necesario para tema oscuro/claro */}
+        <div className="p-6 border-t mt-auto bg-background sticky bottom-0"> 
           {isInDialogContext ? (
             <DialogFooter>
               <DialogClose asChild>

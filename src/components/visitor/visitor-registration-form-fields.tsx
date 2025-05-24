@@ -14,7 +14,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, UserCheck, Camera, FileImage, ScanLine, UserSquare2, Info, Loader2 } from "lucide-react";
+import { CalendarIcon, UserCheck, Camera, FileImage, ScanLine, UserSquare2, Info, Loader2, MapPin } from "lucide-react"; // CAMBIO: Añadido MapPin
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -31,6 +31,7 @@ export interface VisitorFormFieldsProps {
   epsOptions: string[];
   parentescosOptions: string[];
   employeeComboboxOptions: ComboboxOption[];
+  sedeOptions: ComboboxOption[]; // CAMBIO: Añadida prop para opciones de sede
   showScannerSection?: boolean;
   isAutoregistro?: boolean;
 }
@@ -43,7 +44,8 @@ export function VisitorRegistrationFormFields({
   arlOptions,
   epsOptions,
   parentescosOptions,
-  employeeComboboxOptions, // En autoregistro, esto será un array vacío []
+  employeeComboboxOptions,
+  sedeOptions, // CAMBIO: Recibir sedeOptions
   showScannerSection = true,
   isAutoregistro = false,
 }: VisitorFormFieldsProps) {
@@ -218,8 +220,6 @@ export function VisitorRegistrationFormFields({
     }, 1500);
   };
 
-  // CAMBIO: Determinar si el campo de anfitrión (Persona a Visitar) debe mostrarse.
-  // Se mostrará solo si NO es autoregistro Y si hay opciones de empleados disponibles.
   const shouldShowHostField = !isAutoregistro && employeeComboboxOptions && employeeComboboxOptions.length > 0;
 
   return (
@@ -290,7 +290,30 @@ export function VisitorRegistrationFormFields({
       <Card>
         <CardHeader><CardTitle className="text-lg">Detalles de la Visita</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* CAMBIO: Renderizado condicional del campo "Persona a Visitar" */}
+          {/* CAMBIO: Añadido campo para seleccionar Sede, visible en autoregistro si hay opciones */}
+          {isAutoregistro && sedeOptions && sedeOptions.length > 0 && (
+            <FormField
+              control={form.control}
+              name="sedeId"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2"> {/* Ocupa todo el ancho si es el único campo de esta fila */}
+                  <FormLabel>Sede a Visitar</FormLabel>
+                  <Combobox
+                    options={sedeOptions}
+                    value={field.value || ""}
+                    onChange={(value) => field.onChange(value)}
+                    placeholder="Seleccione la sede"
+                    searchPlaceholder="Buscar sede..."
+                    emptyMessage="Sede no encontrada."
+                    disabled={field.disabled}
+                    icon={<MapPin className="mr-2 h-4 w-4 text-primary" />}
+                  />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
           {shouldShowHostField && (
             <FormField control={form.control} name="personavisitadaId" render={({ field }) => (
                 <FormItem className="md:col-span-2"> 
@@ -301,9 +324,9 @@ export function VisitorRegistrationFormFields({
                     onChange={(value) => field.onChange(value === "" ? null : value)}
                     getOptionLabel={(option) => (option as ComboboxOption).label}
                     getOptionValue={(option) => (option as ComboboxOption).value}
-                    placeholder="Buscar anfitrión..." // Modificado placeholder
+                    placeholder="Buscar anfitrión..." 
                     searchPlaceholder="Escriba nombre o ID..."
-                    emptyMessage="Anfitrión no encontrado." // Modificado emptyMessage
+                    emptyMessage="Anfitrión no encontrado." 
                     disabled={field.disabled}
                     icon={<UserCheck className="mr-2 h-4 w-4 text-primary" />}
                 />
@@ -312,8 +335,15 @@ export function VisitorRegistrationFormFields({
             )}/>
           )}
           <FormField control={form.control} name="tipovisita" render={({ field }) => (
-              // CAMBIO: El className ahora depende de si el campo de anfitrión se muestra.
-              <FormItem className={shouldShowHostField ? "" : "md:col-span-2"}>
+              <FormItem className={
+                // CAMBIO: Ajustar col-span para tipovisita
+                // Si es autoregistro Y hay sedes, tipovisita va en una columna normal (asumiendo que sede toma 2 columnas arriba)
+                // O si NO es autoregistro Y el campo de anfitrión se muestra, tipovisita va en columna normal.
+                // Si es autoregistro Y NO hay sedes O NO es autoregistro Y NO se muestra anfitrión, entonces md:col-span-2
+                (isAutoregistro && sedeOptions && sedeOptions.length > 0) || shouldShowHostField
+                  ? "" 
+                  : "md:col-span-2"
+              }>
                 <FormLabel>Tipo de Visita</FormLabel>
                 <Combobox options={tiposDeVisitaOptions} value={field.value || ""} onChange={(value) => field.onChange(value)} placeholder="Seleccione tipo" disabled={field.disabled} emptyMessage="Tipo no encontrado." searchPlaceholder="Buscar tipo..." />
                 <FormMessage />
